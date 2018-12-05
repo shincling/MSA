@@ -27,7 +27,7 @@ def cut_with_annotations(aimed_uri,path_to_uris,video_label):
     assert len(times)==len(names)
     print(uri,': times and names got with length of ',len(names))
     file_name=path_to_uris+uri+'/video/{}.{}.avi'.format(uri,video_label)
-    file_name_audio=path_to_uris+uri+'/audio/{}.Mix-Headset.wav'.format(uri)
+    file_name_audio=path_to_uris[:-1]+'_audio/'+uri+'/audio/{}.Mix-Headset.wav'.format(uri)
     output_path='./aim_sets/'+uri+'/cutted_{}/'.format(video_label)
 
     if os.path.exists(output_path):
@@ -51,6 +51,7 @@ def cut_with_annotations(aimed_uri,path_to_uris,video_label):
                 print('Remove previous file.',output_file_name_pre)
                 os.remove(output_file_name_pre+'.avi')
                 os.remove(output_file_name_pre+'.wav')
+                shutil.rmtree(output_file_name_pre)
             end_time_pre=end_time
             idx+=1
             continue
@@ -66,8 +67,26 @@ def cut_with_annotations(aimed_uri,path_to_uris,video_label):
                                  '-an',
                                  '-y', output_path+str(idx)+'_'+name+'_'\
                                        +str(round(start_time,3))+'_'+str(round(end_time,3))+'.avi'
+                                       # +str(round(start_time,3))+'_'+str(round(end_time,3))+'/%06d.jpeg'
                                  ]
             subprocess.call(video_cut_command, stdout=ffmpeg_log, stderr=ffmpeg_log)
+
+        with open('cutting_log', "w") as ffmpeg_log:
+            os.mkdir(output_path+str(idx)+'_'+name+'_' \
+                                 +str(round(start_time,3))+'_'+str(round(end_time,3)))
+            image_cut_command = ['ffmpeg',
+                                 '-ss',  str(start_time),
+                                 '-t', str(end_time-start_time),
+                                 '-i', file_name,  # input file
+                                 # '-c:v libx264 -c:a ac -strict experimental',
+                                 '-an',
+                                 '-y', output_path+str(idx)+'_'+name+'_' \
+                                 +str(round(start_time,3))+'_'+str(round(end_time,3))+'/'\
+                                 +str(idx)+'_'+name+'_' \
+                                 +str(round(start_time,3))+'_'+str(round(end_time,3))+'_%06d.jpeg'
+                                 ]
+            print(image_cut_command)
+            subprocess.call(image_cut_command, stdout=ffmpeg_log, stderr=ffmpeg_log)
 
         with open('cutting_log', "w") as ffmpeg_log:
             audio_cut_command = ['ffmpeg',
@@ -88,6 +107,13 @@ def cut_with_annotations(aimed_uri,path_to_uris,video_label):
 # print(output('TS3003a'))
 
 path_to_uris='/home/user/shijing/datasets/AMI/amicorpus/'
+''' Dir structure:
+root
+  --amicorpus
+    --urisXXXX/video
+  --amicorpus_audio
+    --urisXXXX/audio
+'''
 uri_list=os.listdir(path_to_uris)
 for uri in uri_list:
     print('*'*40)
