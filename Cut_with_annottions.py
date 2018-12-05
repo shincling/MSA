@@ -19,16 +19,16 @@ def output(meeting_uri):
             except StopIteration:
                 break
 
-def cut_with_annotations(aimed_uri,path_to_uris):
+def cut_with_annotations(aimed_uri,path_to_uris,video_label):
     uri=aimed_uri['uri'].split('.')[0]
     annotation=aimed_uri['annotation']._tracks
     times=[i for i in annotation]
     names=[list(i.values())[0] for i in annotation.values()]
     assert len(times)==len(names)
     print(uri,': times and names got with length of ',len(names))
-    file_name=path_to_uris+uri+'/video/{}.Overview1.avi'.format(uri)
+    file_name=path_to_uris+uri+'/video/{}.{}.avi'.format(uri,video_label)
     file_name_audio=path_to_uris+uri+'/audio/{}.Mix-Headset.wav'.format(uri)
-    output_path='./aim_sets/'+uri+'/cutted/'
+    output_path='./aim_sets/'+uri+'/cutted_{}/'.format(video_label)
 
     if os.path.exists(output_path):
         print(" cleanup: " + output_path)
@@ -88,6 +88,25 @@ def cut_with_annotations(aimed_uri,path_to_uris):
 # print(output('TS3003a'))
 
 path_to_uris='/home/user/shijing/datasets/AMI/amicorpus/'
+uri_list=os.listdir(path_to_uris)
+for uri in uri_list:
+    print('*'*40)
+    print('Begin to conduct uri:',uri)
+    aimed_uri=output(uri)
+    if uri[0]=='E':
+        video_label='Corner'
+        cut_with_annotations(aimed_uri,path_to_uris,video_label)
+    elif uri[0]=='I':
+        video_label='C'
+        cut_with_annotations(aimed_uri,path_to_uris,video_label)
+    elif uri[0]=='T':
+        video_label='Overview1'
+        cut_with_annotations(aimed_uri,path_to_uris,video_label)
+        video_label='Overview2'
+        cut_with_annotations(aimed_uri,path_to_uris,video_label)
+    else:
+        print('Wrong uri name.')
+        1/0
 
 aimed_uri=output('TS3003a')
 cut_with_annotations(aimed_uri,path_to_uris)
