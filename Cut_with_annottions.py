@@ -9,6 +9,7 @@ protocol_name='AMI.SpeakerDiarization.MixHeadset'
 protocol = get_protocol(protocol_name, progress=False)
 
 def output(meeting_uri):
+    # To extract the annotations for the given meeting uri.
     for gen in [protocol.train(),protocol.development(),protocol.test()]:
         while True:
             try:
@@ -37,9 +38,25 @@ def cut_with_annotations(aimed_uri,path_to_uris):
     assert uri in os.listdir(path_to_uris)
     idx=1
     # TODO: Don't do the video cutter, just extract the images directly.
+    end_time_pre=0
+    output_file_name_pre=''
+    counter=0
     for time,name in tqdm(zip(times,names)):
-        start_time,end_time=time[0],time[1]o
+        start_time,end_time=time[0],time[1]
+        if end_time-start_time>1: #calculate the ratio of length larger than 1s. About 60%.
+            counter+=1
+        if start_time<end_time_pre: # if overlapped
+            print('The {} with start time {} Overlaped.'.format(idx,start_time))
+            if os.path.exists(output_file_name_pre+'.avi'):
+                print('Remove previous file.',output_file_name_pre)
+                os.remove(output_file_name_pre+'.avi')
+                os.remove(output_file_name_pre+'.wav')
+            end_time_pre=end_time
+            idx+=1
+            continue
         with open('cutting_log', "w") as ffmpeg_log:
+            output_file_name_pre=output_path+str(idx)+'_'+name+'_'\
+                                 +str(round(start_time,3))+'_'+str(round(end_time,3))
             video_cut_command = ['ffmpeg',
                                  '-ss',  str(start_time),
                                  '-i', file_name,  # input file
@@ -64,7 +81,9 @@ def cut_with_annotations(aimed_uri,path_to_uris):
                                  +str(round(start_time,3))+'_'+str(round(end_time,3))+'.wav'
                                  ]
             subprocess.call(audio_cut_command, stdout=ffmpeg_log, stderr=ffmpeg_log)
-            idx+=1
+        idx+=1
+        end_time_pre=end_time
+    print('Ratio of the counter.',float(counter/idx))
 
 # print(output('TS3003a'))
 
