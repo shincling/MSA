@@ -85,7 +85,7 @@ def cut_with_annotations(aimed_uri,path_to_uris,video_label):
                                  +str(idx)+'_'+name+'_' \
                                  +str(round(start_time,3))+'_'+str(round(end_time,3))+'_%06d.jpeg'
                                  ]
-            print(image_cut_command)
+            # print(image_cut_command)
             subprocess.call(image_cut_command, stdout=ffmpeg_log, stderr=ffmpeg_log)
 
         with open('cutting_log', "w") as ffmpeg_log:
@@ -118,21 +118,25 @@ uri_list=os.listdir(path_to_uris)
 for uri in uri_list:
     print('*'*40)
     print('Begin to conduct uri:',uri)
-    aimed_uri=output(uri)
-    if uri[0]=='E':
-        video_label='Corner'
-        cut_with_annotations(aimed_uri,path_to_uris,video_label)
-    elif uri[0]=='I':
-        video_label='C'
-        cut_with_annotations(aimed_uri,path_to_uris,video_label)
-    elif uri[0]=='T':
-        video_label='Overview1'
-        cut_with_annotations(aimed_uri,path_to_uris,video_label)
-        video_label='Overview2'
-        cut_with_annotations(aimed_uri,path_to_uris,video_label)
-    else:
-        print('Wrong uri name.')
-        1/0
+    try:
+        aimed_uri=output(uri)
+        if uri[0]=='E':
+            video_label='Corner'
+            cut_with_annotations(aimed_uri,path_to_uris,video_label)
+        elif uri[0]=='I':
+            video_label='C'
+            cut_with_annotations(aimed_uri,path_to_uris,video_label)
+        elif uri[0]=='T':
+            video_label='Overview1'
+            cut_with_annotations(aimed_uri,path_to_uris,video_label)
+            video_label='Overview2'
+            cut_with_annotations(aimed_uri,path_to_uris,video_label)
+        else:
+            print('Wrong uri name.')
+            1/0
+    except Exception as result:
+        print('Erros occor here~!!!!!')
+        print(result)
 
-aimed_uri=output('TS3003a')
-cut_with_annotations(aimed_uri,path_to_uris)
+# aimed_uri=output('TS3003a')
+# cut_with_annotations(aimed_uri,path_to_uris)
