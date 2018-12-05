@@ -4,6 +4,10 @@ import subprocess
 import shutil
 from tqdm import tqdm
 from pyannote.database import get_protocol
+import time
+from multiprocessing import Process
+import threading
+import time
 
 protocol_name='AMI.SpeakerDiarization.MixHeadset'
 protocol = get_protocol(protocol_name, progress=False)
@@ -115,7 +119,8 @@ root
     --urisXXXX/audio
 '''
 uri_list=os.listdir(path_to_uris)
-for uri in uri_list:
+btime=time.time()
+for uri in uri_list[:3]:
     print('*'*40)
     print('Begin to conduct uri:',uri)
     try:
@@ -138,5 +143,6 @@ for uri in uri_list:
         print('Erros occor here~!!!!!')
         print(result)
 
+print('Takes total time:',time.time()-btime)
 # aimed_uri=output('TS3003a')
 # cut_with_annotations(aimed_uri,path_to_uris)
