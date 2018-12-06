@@ -50,9 +50,9 @@ def cut_with_annotations(aimed_uri,path_to_uris,video_label):
         if end_time-start_time>1: #calculate the ratio of length larger than 1s. About 60%.
             counter+=1
         if start_time<end_time_pre: # if overlapped
-            print('The {} with start time {} Overlaped.'.format(idx,start_time))
+            # print('The {} with start time {} Overlaped.'.format(idx,start_time))
             if os.path.exists(output_file_name_pre+'.avi'):
-                print('Remove previous file.',output_file_name_pre)
+                # print('Remove previous file.',output_file_name_pre)
                 os.remove(output_file_name_pre+'.avi')
                 os.remove(output_file_name_pre+'.wav')
                 shutil.rmtree(output_file_name_pre)
@@ -120,7 +120,7 @@ root
 '''
 uri_list=os.listdir(path_to_uris)
 btime=time.time()
-for uri in uri_list[:3]:
+def one_step(uri):
     print('*'*40)
     print('Begin to conduct uri:',uri)
     try:
@@ -142,6 +142,12 @@ for uri in uri_list[:3]:
     except Exception as result:
         print('Erros occor here~!!!!!')
         print(result)
+    print('Takes total time:',time.time()-btime)
+
+for uri in uri_list:
+    # one_step(uri)
+    p=Process(target=one_step,args=(uri,))
+    p.start()
 
 print('Takes total time:',time.time()-btime)
 # aimed_uri=output('TS3003a')
