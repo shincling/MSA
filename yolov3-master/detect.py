@@ -13,6 +13,8 @@ parser = argparse.ArgumentParser()
 # Get data configuration
 
 parser.add_argument('-image_folder', type=str, default='data/samples', help='path to images')
+# parser.add_argument('-image_folder', type=str, default='./data/samples/37.jpeg', help='path to images')
+# parser.add_argument('-image_folder', type=str, default='./data/samples/zidane.jpg', help='path to images')
 parser.add_argument('-output_folder', type=str, default='output', help='path to outputs')
 parser.add_argument('-plot_flag', type=bool, default=True)
 parser.add_argument('-txt_out', type=bool, default=False)
@@ -35,13 +37,19 @@ def main(opt):
     model = Darknet(opt.cfg, opt.img_size)
 
     weights_path = f_path + 'weights/yolov3.pt'
+    #weights_path = f_path + 'weights/yolov3.weights'
+    # weights_path = f_path + 'weights/darknet53.conv.74'
     if weights_path.endswith('.pt'):  # pytorch format
         if weights_path.endswith('weights/yolov3.pt') and not os.path.isfile(weights_path):
             os.system('wget https://storage.googleapis.com/ultralytics/yolov3.pt -O ' + weights_path)
+        # checkpoint = torch.load(weights_path, map_location='cpu')
+        checkpoint = torch.load(weights_path, map_location='cuda:0')
+        model.load_state_dict(checkpoint['model'])
+        del checkpoint
     else:  # darknet format
         load_weights(model, weights_path)
 
-        checkpoint = torch.load(weights_path, map_location='cpu')
+        checkpoint = torch.load(weights_path, map_location='cuda:0')
         model.load_state_dict(checkpoint['model'])
         del checkpoint
 
