@@ -78,7 +78,10 @@ def main(opt):
 
         # Get detections
         with torch.no_grad():
-            pred = model(torch.from_numpy(img).unsqueeze(0).to(device))
+            pred,features = model(torch.from_numpy(img).unsqueeze(0).to(device))
+            print(features.size())
+            continue
+
             pred = pred[pred[:, :, 4] > opt.conf_thres]
 
             if len(pred) > 0:

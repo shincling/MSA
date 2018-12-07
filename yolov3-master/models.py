@@ -264,6 +264,9 @@ class Darknet(nn.Module):
                     x = module(x)
                 output.append(x)
             layer_outputs.append(x)
+        features74=layer_outputs[74]
+        assert features74.size()==(1,1024,13,13)
+        # print('Features from Darknet with size:',features74.size())
 
         if is_training:
             if batch_report:
@@ -290,7 +293,7 @@ class Darknet(nn.Module):
             self.losses['nT'] /= 3
             self.losses['TC'] = 0
 
-        return sum(output) if is_training else torch.cat(output, 1)
+        return sum(output) if is_training else torch.cat(output, 1),features74[0]
 
 
 def load_weights(self, weights_path, cutoff=-1):
