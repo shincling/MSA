@@ -18,9 +18,11 @@ def output(meeting_uri):
         while True:
             try:
                 cc=next(gen) # including an ordered Dict with annotations we need.
+                print(cc['uri'])
                 if meeting_uri==cc['uri'].split('.')[0]:
                     return cc
             except StopIteration:
+                print('Gets no aimed uri:',meeting_uri)
                 break
 
 def cut_with_annotations(aimed_uri,path_to_uris,video_label):
@@ -145,10 +147,21 @@ def one_step(uri):
     print('Takes total time:',time.time()-btime)
 
 for uri in uri_list:
-    # one_step(uri)
     p=Process(target=one_step,args=(uri,))
     p.start()
 
 print('Takes total time:',time.time()-btime)
 # aimed_uri=output('TS3003a')
 # cut_with_annotations(aimed_uri,path_to_uris)
+
+# Errors occur at this list:
+# Following: the test of the error_lists.
+'''
+error_uris_list=['EN2002a','EN2002c','EN2003a','EN2009d',
+                 'IB4002','IB4003','IB4004','IB4005','IB4010','IB4011',
+                 'IS1003b','IS1007d','TS3009c']
+
+for uri in error_uris_list:
+    assert uri not in os.listdir('./aim_sets/')
+    one_step(uri)
+'''
