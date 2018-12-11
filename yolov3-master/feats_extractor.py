@@ -61,6 +61,7 @@ def main(opt):
     files_root='../aim_sets/' #158 in total
     prev_time = time.time()
     aim_uris=sorted(os.listdir(files_root))
+    print('total uris:',aim_uris)
     for uri in aim_uris:
         views=os.listdir(files_root+uri+'/')
         for view in views: #different view of one meeting
