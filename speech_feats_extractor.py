@@ -19,6 +19,8 @@ def convert2(array):
     return o
 
 def process_uris(data_path): # func for every uri
+    print('*'*40)
+    print('Begin to process',data_path)
     views=os.listdir(data_path)
     for view in views: # every different view
         images_npy_ids=[]
@@ -27,7 +29,7 @@ def process_uris(data_path): # func for every uri
                 images_npy_ids.append(name.replace('.npy',''))
         ids=sorted(images_npy_ids)
         for id in ids: # different part of the meeting
-            speech_name=data_path+'/'+view+'/'+id
+            speech_name=data_path+'/'+view+'/'+id+'.wav'
             signal, rate = sf.read(speech_name)  # signal 是采样值，rate 是采样频率
             if len(signal.shape) > 1:
                 signal = signal[:, 0]
@@ -60,6 +62,19 @@ def process_uris(data_path): # func for every uri
                     feature_speech=pow(feature_speech,0.3)
                 feature_speech=convert2(feature_speech)
 
+            # print(speech_name,' audio size:',feature_speech.shape)
+            # print(speech_name,' video size:',(np.load(speech_name.replace('wav','npy'))).shape)
+
+            audio_length=feature_speech.shape[0]
+            aim_length=4*np.load(speech_name.replace('wav','npy')).shape[0]
+            if audio_length<aim_length: #　现在的比较短，就补足
+                for ___ in range(aim_length-audio_length):
+                    feature_speech=np.append(feature_speech,feature_speech[-1:],0)
+            elif audio_length>aim_length: # 现在的长了，就减短
+                feature_speech=feature_speech[:aim_length]
+            assert feature_speech.shape[0]==aim_length
+
+
 
 prepared_urils=['IN1013', 'IN1014', 'IN1016', 'IS1000a', 'IS1000b', 'IS1000c', 'IS1000d',
                 'IS1001a', 'IS1001b', 'IS1001c', 'IS1001d', 'IS1002b', 'IS1002c', 'IS1002d',
@@ -68,6 +83,9 @@ prepared_urils=['IN1013', 'IN1014', 'IN1016', 'IS1000a', 'IS1000b', 'IS1000c', '
                 'IS1007a', 'IS1007b', 'IS1007c','TS3003b', 'TS3003c', 'TS3003d', 'TS3004a',
                 'TS3004b', 'TS3004c', 'TS3004d', 'TS3005a', 'TS3005b', 'TS3005c', 'TS3005d', 'TS3006a']
 for uri in prepared_urils:
-    data_path='~/shijing/disk0/aim_sets/'+uri
+    if uri not in os.listdir('/home/user/shijing/disk0/aim_sets/'):
+        print('No uri',uri,'\n')
+        continue
+    data_path='/home/user/shijing/disk0/aim_sets/'+uri
     process_uris(data_path)
 
