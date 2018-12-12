@@ -23,6 +23,14 @@ def process_uris(data_path): # func for every uri
     print('Begin to process',data_path)
     views=os.listdir(data_path)
     for view in views: # every different view
+        print('Begin to process:', data_path + '/' + view)
+        for name in os.listdir(data_path + '/' + view):
+            if '.avi' in name:
+                break
+        else:
+            print('No avi in ', data_path + '/' + view)
+            continue
+
         images_npy_ids=[]
         for name in os.listdir(data_path+'/'+view):
             if '.npy' in name:
@@ -73,6 +81,7 @@ def process_uris(data_path): # func for every uri
             elif audio_length>aim_length: # 现在的长了，就减短
                 feature_speech=feature_speech[:aim_length]
             assert feature_speech.shape[0]==aim_length
+            np.save(data_path+'/'+view+'/Audio_'+id+'.npy',feature_speech)
 
 
 
