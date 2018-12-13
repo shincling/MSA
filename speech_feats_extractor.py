@@ -2,15 +2,11 @@
 import sys
 import os
 import numpy as np
-import time
-import random
 import config as config
-import re
 import soundfile as sf
 import resampy
 import librosa
-import shutil
-import subprocess
+from tqdm import tqdm
 
 def convert2(array):
     shape=array.shape
@@ -70,18 +66,22 @@ def process_uris(data_path): # func for every uri
                     feature_speech=pow(feature_speech,0.3)
                 feature_speech=convert2(feature_speech)
 
-            # print(speech_name,' audio size:',feature_speech.shape)
-            # print(speech_name,' video size:',(np.load(speech_name.replace('wav','npy'))).shape)
+            #print(speech_name,' audio size:',feature_speech.shape)
+            #print(speech_name,' video size:',(np.load(speech_name.replace('wav','npy'))).shape)
 
-            audio_length=feature_speech.shape[0]
-            aim_length=4*np.load(speech_name.replace('wav','npy')).shape[0]
-            if audio_length<aim_length: #　现在的比较短，就补足
-                for ___ in range(aim_length-audio_length):
-                    feature_speech=np.append(feature_speech,feature_speech[-1:],0)
-            elif audio_length>aim_length: # 现在的长了，就减短
-                feature_speech=feature_speech[:aim_length]
-            assert feature_speech.shape[0]==aim_length
-            np.save(data_path+'/'+view+'/Audio_'+id+'.npy',feature_speech)
+            try:
+                audio_length=feature_speech.shape[0]
+                aim_length=4*np.load(speech_name.replace('wav','npy')).shape[0]
+                if audio_length<aim_length: #　现在的比较短，就补足
+                    for ___ in range(aim_length-audio_length):
+                        feature_speech=np.append(feature_speech,feature_speech[-1:],0)
+                elif audio_length>aim_length: # 现在的长了，就减短
+                    feature_speech=feature_speech[:aim_length]
+                assert feature_speech.shape[0]==aim_length
+                np.save(data_path+'/'+view+'/'+id+'_Audio.npy',feature_speech)
+            except Exception as rr:
+                print('EEE',rr)
+                continue
 
 
 
@@ -91,7 +91,10 @@ prepared_urils=['IN1013', 'IN1014', 'IN1016', 'IS1000a', 'IS1000b', 'IS1000c', '
                 'IS1005a', 'IS1005b', 'IS1005c', 'IS1006a', 'IS1006b', 'IS1006c', 'IS1006d',
                 'IS1007a', 'IS1007b', 'IS1007c','TS3003b', 'TS3003c', 'TS3003d', 'TS3004a',
                 'TS3004b', 'TS3004c', 'TS3004d', 'TS3005a', 'TS3005b', 'TS3005c', 'TS3005d', 'TS3006a']
-for uri in prepared_urils:
+prepared_urils=os.listdir('/home/user/shijing/disk0/aim_sets/')
+print('All prepared_urils:\n',prepared_urils)
+# for uri in tqdm(prepared_urils[43:]):
+for uri in tqdm(prepared_urils[43:]):
     if uri not in os.listdir('/home/user/shijing/disk0/aim_sets/'):
         print('No uri',uri,'\n')
         continue
