@@ -22,7 +22,7 @@ def extract_frames(video, dst):
     with open('video_log', "w") as ffmpeg_log:
         video_id = video.split("/")[-1].split(".")[0]
         if os.path.exists(dst):
-            print " cleanup: " + dst + "/"
+            # print " cleanup: " + dst + "/"
             shutil.rmtree(dst)
         os.makedirs(dst)
         video_to_frames_command = ["ffmpeg",
@@ -57,7 +57,7 @@ def prepare_datasize(gen):
     #此处顺序是 mix_speechs.shape,mix_feas.shape,aim_fea.shape,aim_spkid.shape,query.shape
     #一个例子：(5, 17040) (5, 134, 129) (5, 134, 129) (5,) (5, 32, 400, 300, 3)
     #暂时输出的是：语音长度、语音频率数量、视频截断之后的长度
-    print 'datasize:',data[1].shape[1],data[1].shape[2],data[4].shape[1],data[-1],(data[4].shape[2],data[4].shape[3])
+    # print 'datasize:',data[1].shape[1],data[1].shape[2],data[4].shape[1],data[-1],(data[4].shape[2],data[4].shape[3])
     return data[1].shape[1],data[1].shape[2],data[4].shape[1],data[-1],(data[4].shape[2],data[4].shape[3])
 
 def create_mix_list(train_or_test,mix_k,data_path,all_spk,Num_samples_per_batch):
@@ -112,8 +112,8 @@ def prepare_data(mode,train_or_test):
         views=os.listdir(meeting_path)
         for view in views: # for every different view
             print('*'*50)
-            print('Begin to process:', view_path)
             view_path=meeting_path+view
+            print('Begin to process:', view_path)
             for name in os.listdir(view_path):
                 if '.npy' in name:
                     break
@@ -131,8 +131,8 @@ def prepare_data(mode,train_or_test):
                     continue
                 iidx,spk_name,start_time,end_time=id.split('_')
                 all_list.append({
-                    'speech_path':'/'.join(aim_meeting,view,id)+'_Audio.npy',
-                    'images_path':'/'.join(aim_meeting,view,id)+'.npy',
+                    'speech_path':'/'.join([aim_meeting,view,id])+'_Audio.npy',
+                    'images_path':'/'.join([aim_meeting,view,id])+'.npy',
                     'duration':float(end_time)-float(start_time),
                     'spk_name':spk_name
                 })
@@ -140,5 +140,5 @@ def prepare_data(mode,train_or_test):
 
 
 cc=prepare_data('once','train')
-print(cc)
+# print(cc)
 time.sleep(10)
