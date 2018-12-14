@@ -132,6 +132,12 @@ def train(epoch,data):
             images_feats=np.load(config.aim_path+images_path)
             assert images_feats.shape[0]*4==speech_feats.shape[0]
         print('Enter into the model:',images_feats.shape,speech_feats.shape)
+        images_feats=Variable(torch.tensor(images_feats))
+        speech_feats=Variable(torch.tensor(speech_feats))
+        if use_cuda:
+            images_feats=images_feats.cuda()
+            speech_feats=speech_feats.cuda()
+        model(images_feats,speech_feats)
 
     return
 

@@ -98,8 +98,8 @@ SEED = 1234
 Min_Len = 0.5
 Max_Len = 3.0
 
-
-
+speech_fre=257
+image_size=(13,13)
 
 Num_samples_per_epoch=2000 #如果没有预订提供的list,则设定一个Epoch里的训练样本数目
 # 是否读取参数
