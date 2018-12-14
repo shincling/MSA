@@ -14,9 +14,8 @@ import subprocess
 # import Image
 from PIL import Image
 
-channel_first=config.channel_first
-# np.random.seed(1)#设定种子
-# random.seed(1)
+np.random.seed(config.SEED)#设定种子
+random.seed(config.SEED)
 
 def extract_frames(video, dst):
     with open('video_log', "w") as ffmpeg_log:
@@ -126,7 +125,8 @@ def prepare_data(mode,train_or_test):
             ids = sorted(set(cutted_samples))
             for id in ids:  # different part of the meeting
                 if (id+'.npy') in files_in_view and (id+'_Audio.npy') in files_in_view:
-                    print('Got dual feats for ',id)
+                    # print('Got dual feats for ',id)
+                    pass
                 else:
                     continue
                 iidx,spk_name,start_time,end_time=id.split('_')
