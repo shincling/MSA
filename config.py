@@ -94,6 +94,10 @@ bidirec = 1
 start_decay_at = 5
 log ='log/'
 
+SEED = 1234
+Min_Len = 0.5
+Max_Len = 3.0
+
 
 
 

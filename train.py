@@ -1,6 +1,7 @@
 import os
 import argparse
 import time
+import random
 # import collections
 # import lera
 
@@ -15,13 +16,14 @@ import utils
 from optims import Optim
 import lr_scheduler as L
 from models import model
+from predata_fromnp import prepare_data
 
 #config
 parser = argparse.ArgumentParser(description='train.py')
 
 parser.add_argument('-config', default='config.py', type=str,
                     help="config file")
-parser.add_argument('-gpus', default=[2,3,4], nargs='+', type=int,
+parser.add_argument('-gpus', default=[2], nargs='+', type=int,
                     help="Use CUDA on the listed devices.")
 parser.add_argument('-restore', default=None, type=str,
                    help="restore checkpoint")
@@ -54,8 +56,7 @@ if use_cuda:
     torch.cuda.manual_seed(opt.seed)
 
 print('building model...\n')
-# 这个用法有意思，实际是 调了model.seq2seq 并且运行了最后这个括号里的五个参数的方法。(初始化了一个对象也就是）
-model = getattr(models, opt.model)(config, use_cuda, all_spk_num)
+model = model.basic_model(config, use_cuda, all_spk_num)
 
 if opt.restore:
     model.load_state_dict(checkpoints['model'])
@@ -73,9 +74,9 @@ else:
     optim = Optim(config.optim, config.learning_rate, config.max_grad_norm,
                   lr_decay=config.learning_rate_decay, start_decay_at=config.start_decay_at)
 
-optim.set_parameters(model.parameters())
-if config.schedule:
-    scheduler = L.CosineAnnealingLR(optim.optimizer, T_max=config.epoch)
+# optim.set_parameters(model.parameters())
+# if config.schedule:
+#     scheduler = L.CosineAnnealingLR(optim.optimizer, T_max=config.epoch)
 
 # log file path
 if opt.log == '':
@@ -84,8 +85,8 @@ else:
     log_path = config.log + opt.log + '.log'
 logging = utils.logging(log_path) # 这种方式也值得学习，单独写一个logging的函数，直接调用，既print，又记录到Log文件里。
 
-for k, v in config.items():
-    logging("%s:\t%s\n" % (str(k), str(v)))
+# for k, v in [i for i in locals().items()]:
+#     logging("%s:\t%s\n" % (str(k), str(v)))
 logging("\n")
 logging(repr(model)+"\n\n")
 
@@ -106,18 +107,53 @@ def save_model(path):
 
     torch.save(checkpoints, path)
 
-def train(epoch):
+def train(epoch,data):
+    print('*'*25,'Train epoch:',epoch,'*'*25)
+    random.shuffle(data)
+    print('First of data:',data[0])
+    for idx,part in enumerate(data):
+        speech_path,images_path,duration,spk_name=part['speech_path'],\
+                                                  part['images_path'],\
+                                                  part['duration'],part['spk_name']
+        if duration<config.Min_Len:
+            continue
+        elif duration>config.Max_Len:
+            speech_feats=np.load(config.aim_path+speech_path)
+            images_feats=np.load(config.aim_path+images_path)
+            assert images_feats.shape[0]*4==speech_feats.shape[0]
+            shift_time=np.random.random()*(duration-config.Max_Len) #可供移动的时间长度
+            shift_frames_image=int(shift_time*25)
+            shift_frames_speech=4*shift_frames_image
+            images_feats=images_feats[shift_frames_image:int(shift_frames_image+config.Max_Len*25)]
+            speech_feats=speech_feats[shift_frames_speech:int(shift_frames_speech+config.Max_Len*100)]
+            assert images_feats.shape[0]*4==speech_feats.shape[0]
+        else:
+            speech_feats=np.load(config.aim_path+speech_path)
+            images_feats=np.load(config.aim_path+images_path)
+            assert images_feats.shape[0]*4==speech_feats.shape[0]
+        print('Enter into the model:',images_feats.shape,speech_feats.shape)
+
     return
 
-def eval(epoch):
+def eval(epoch,data):
+    print('*'*25,'Eval epoch:',epoch,'*'*25)
+    random.shuffle(data)
+    print('First of data:',data[0])
     return
 
 def main():
-    for i in range(1, config.epoch+1):
-        if not config.notrain:
-            train(i)
+    train_data,eval_data=None,None
+    for i in range(1, config.EPOCH_SIZE+1):
+        if not opt.notrain:
+            if not train_data:
+                train_data=prepare_data('once','train')
+                print('Train data gets items of: ',len(train_data))
+            train(i,train_data)
         else:
-            eval(i)
+            if not eval_data:
+                eval_data=prepare_data('once','valid')
+                print('EVAL data gets items of: ',len(eval_data))
+            eval(i,eval_data)
     for metric in config.metric:
         logging("Best %s score: %.2f\n" % (metric, max(scores[metric])))
 
