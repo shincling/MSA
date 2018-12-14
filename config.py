@@ -10,19 +10,6 @@ import resampy
 import numpy as np
 from scipy import signal
 
-def valid_mode_dataset():
-    if MODE==1:
-        if DATASET not in ['THCHS-30','WSJ0','TIMIT']:
-            raise ValueError("Dataset {} is not Speech!!!".format(DATASET))
-    if MODE==2:
-        if DATASET not in ['MNIST']:
-            raise ValueError("Dataset {} is not Image!!!".format(DATASET))
-    if MODE==3:
-        if DATASET not in ['AVA','GRID']:
-            raise ValueError("Dataset {} is not Video!!!".format(DATASET))
-    if MODE==4:
-        print('Top-down Query.')
-
 def update_max_len(file_path_list, max_len):
     tmp_max_len = 0
     # 用于搜集不同语音的长度
@@ -59,25 +46,11 @@ def update_max_len(file_path_list, max_len):
 HAS_INIT_CONFIG = False
 MAT_ENG = []
 # External configuration file
-CONFIG_FILE = './config.cfg'
-# mode=1 纯净语音刺激, 2 图片刺激, 3 视频刺激, 4 top-down概念刺激
-MODE = 3
-# 数据集
-# 1包括：THCHS-30 或者 WSJ0, TIMIT做为模型调试
-# 2包括：ＭNIST
-# 3包括：AVA,GRID
-# 4包括：
-DATASET = 'GRID'
-valid_mode_dataset() #判断MODE和数据集是否对应，不对就抛出异常
-# aim_path='./Dataset_Multi/'+str(MODE)+'/'+DATASET
-# aim_path='/media/sw/Elements/数据集/Grid/Dataset_Multi/'+str(MODE)+'/'+DATASET
-# aim_path='../Torch_multi/Dataset_Multi/'+str(MODE)+'/'+DATASET
-# aim_path='./Dataset/'+str(MODE)+'/'+DATASET
-aim_path='/home/user/aim_sets/
+aim_path='/home/user/shijing/disk0/aim_sets/'
 # 日志记录，Record log into this file, such as dl4ss_output.log_20170303_110305
 LOG_FILE_PRE = './av4ss_output.'+time.strftime('%Y-%m-%d %H:%M:%S')+'.log'
 # 训练文件列表
-TRAIN_LIST = aim_path+'/train_list'
+# TRAIN_LIST = aim_path+'/train_list'
 # TRAIN_LIST = True
 TRAIN_LIST =[
     'EN2001a', 'EN2001b', 'EN2001d', 'EN2001e', 'EN2004a', 'EN2005a', 'EN2006a', 'EN2006b',
@@ -94,16 +67,16 @@ TRAIN_LIST =[
     'IS1006d', 'IS1007a', 'IS1007b', 'IS1007c', 'TS3005a', 'TS3005b', 'TS3005c', 'TS3005d',
     'TS3008a', 'TS3008b', 'TS3008c', 'TS3008d', 'TS3009a', 'TS3009b', 'TS3009d', 'TS3010a',
     'TS3010b', 'TS3010c', 'TS3010d', 'TS3011a', 'TS3011b', 'TS3011c', 'TS3011d', 'TS3012a',
-    'TS3012b', 'TS3012c', 'TS3012d' ] #115 in total
+    'TS3012b', 'TS3012c', 'TS3012d' ] # 115 in total
 # 验证文件列表
-VALID_LIST = aim_path+'/valid_list'
+# VALID_LIST = aim_path+'/valid_list'
 # VALID_LIST = True
 VALID_LIST =[
     'ES2003a', 'ES2003b', 'ES2003c', 'ES2003d', 'ES2011a', 'ES2011b', 'ES2011c', 'ES2011d',
     'IB4001', 'IS1008a', 'IS1008b', 'IS1008c', 'IS1008d', 'TS3004a', 'TS3004b', 'TS3004c',
     'TS3004d', 'TS3006a', 'TS3006b', 'TS3006c', 'TS3006d'] # 21 in total
 # 测试文件列表
-TEST_LIST = aim_path+'/test_list'
+# TEST_LIST = aim_path+'/test_list'
 # TEST_LIST = True
 TEST_LIST = [
     'EN2002b', 'EN2002d', 'ES2004a', 'ES2004b', 'ES2004c', 'ES2004d', 'ES2014a', 'ES2014b',
@@ -111,6 +84,18 @@ TEST_LIST = [
     'TS3003c', 'TS3003d', 'TS3007a', 'TS3007b', 'TS3007c', 'TS3007d'] # 22 in total
 # 未登录文件列表
 UNK_LIST = aim_path+'/unk_list'
+optim = 'adam'
+learning_rate = 0.001
+max_grad_norm = 10
+learning_rate_decay = 0.5
+mask = 1
+schedule = 1
+bidirec = 1
+start_decay_at = 5
+log ='log/'
+
+
+
 
 Num_samples_per_epoch=2000 #如果没有预订提供的list,则设定一个Epoch里的训练样本数目
 # 是否读取参数
@@ -189,29 +174,6 @@ BGD_NOISE_WAV = None
 BGD_NOISE_FILE = 'Dataset_Multi/BGD_150203_010_STR.CH1.wav'
 Out_Sep_Result=True
 
-# VideoSize=(299,299)
-# NUM_ALL_FRAMES=25
-# VIDEO_RATE=10
-# channel_first=True
-if MODE==2:
-    '''Params for Image'''
-    ImageSize=(28,28)
-elif MODE==3:
-    '''Params for Video'''
-    VideoSize=(299,299)
-    NUM_ALL_FRAMES=25
-    VIDEO_RATE=25
-    channel_first=True
-    MAX_LEN_VIDEO=MAX_LEN*VIDEO_RATE
-
-def load_bgd_wav(file_path):
-    signal, rate = sf.read(file_path)  # signal 是采样值，rate 是采样频率
-    if len(signal.shape) > 1:
-        signal = signal[:, 0]
-    if rate != FRAME_RATE:
-        # 如果频率不是设定的频率则需要进行转换
-        signal = resampy.resample(signal, rate, FRAME_RATE, filter='kaiser_fast')
-    return signal
 
 print('\n','*'*40)
 print('All the params:')

@@ -139,6 +139,6 @@ def prepare_data(mode,train_or_test):
     return all_list
 
 
-cc=prepare_data('once','train')
-# print(cc)
-time.sleep(10)
+# cc=prepare_data('once','test')
+# print(len(cc))
+# time.sleep(10)
