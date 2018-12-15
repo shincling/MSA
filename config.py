@@ -84,6 +84,30 @@ TEST_LIST = [
     'TS3003c', 'TS3003d', 'TS3007a', 'TS3007b', 'TS3007c', 'TS3007d'] # 22 in total
 # 未登录文件列表
 UNK_LIST = aim_path+'/unk_list'
+spks_list=['FEE005', 'FEE013', 'FEE016', 'FEE019', 'FEE021', 'FEE024', 'FEE028', 'FEE029',
+           'FEE030', 'FEE032', 'FEE036', 'FEE037', 'FEE038', 'FEE039', 'FEE040', 'FEE041',
+           'FEE042', 'FEE043', 'FEE044', 'FEE046', 'FEE047', 'FEE049', 'FEE050', 'FEE051',
+           'FEE052', 'FEE055', 'FEE057', 'FEE058', 'FEE059', 'FEE060', 'FEE064', 'FEE078',
+           'FEE080', 'FEE081', 'FEE083', 'FEE085', 'FEE087', 'FEE088', 'FEO023', 'FEO026',
+           'FEO065', 'FEO066', 'FEO070', 'FEO072', 'FEO079', 'FEO084', 'FIE038', 'FIE073',
+           'FIE081', 'FIE088', 'FIO017', 'FIO041', 'FIO074', 'FIO084', 'FIO087', 'FIO089',
+           'FIO093', 'FTD019UID', 'MEE006', 'MEE007', 'MEE008', 'MEE009', 'MEE010', 'MEE011',
+           'MEE012', 'MEE014', 'MEE017', 'MEE018', 'MEE025', 'MEE027', 'MEE031', 'MEE033', 'MEE034',
+           'MEE035', 'MEE045', 'MEE048', 'MEE053', 'MEE054', 'MEE056', 'MEE061', 'MEE063', 'MEE067',
+           'MEE068', 'MEE071', 'MEE073', 'MEE089', 'MEE094', 'MEE095', 'MEO015', 'MEO020', 'MEO022',
+           'MEO062', 'MEO069', 'MEO082', 'MEO086', 'MIE002', 'MIE029', 'MIE034', 'MIE080', 'MIE083',
+           'MIE085', 'MIE090', 'MIO005', 'MIO008', 'MIO012', 'MIO016', 'MIO018', 'MIO019', 'MIO020',
+           'MIO022', 'MIO023', 'MIO024', 'MIO025', 'MIO026', 'MIO031', 'MIO035', 'MIO040', 'MIO043',
+           'MIO047', 'MIO049', 'MIO050', 'MIO055', 'MIO066', 'MIO072', 'MIO075', 'MIO076', 'MIO077',
+           'MIO078', 'MIO082', 'MIO086', 'MIO091', 'MIO092', 'MIO097', 'MIO098', 'MIO099', 'MIO100',
+           'MIO101', 'MIO104', 'MIO105', 'MIO106', 'MTD0010ID', 'MTD009PM', 'MTD011UID', 'MTD012ME',
+           'MTD013PM', 'MTD014ID', 'MTD015UID', 'MTD016ME', 'MTD017PM', 'MTD018ID', 'MTD020ME',
+           'MTD021PM', 'MTD022ID', 'MTD023UID', 'MTD024ME', 'MTD025PM', 'MTD026UID', 'MTD027ID',
+           'MTD028ME', 'MTD029PM', 'MTD030ID', 'MTD031UID', 'MTD032ME', 'MTD033PM', 'MTD034ID',
+           'MTD035UID', 'MTD036ME', 'MTD037PM', 'MTD038ID', 'MTD039UID', 'MTD040ME', 'MTD041PM',
+           'MTD042ID', 'MTD043UID', 'MTD044ME', 'MTD045PM', 'MTD046ID', 'MTD047UID', 'MTD048ME']
+
+
 optim = 'adam'
 learning_rate = 0.001
 max_grad_norm = 10
@@ -100,6 +124,7 @@ Max_Len = 3.0
 
 speech_fre=257
 image_size=(13,13)
+size_of_all_spks=179
 
 Num_samples_per_epoch=2000 #如果没有预订提供的list,则设定一个Epoch里的训练样本数目
 # 是否读取参数

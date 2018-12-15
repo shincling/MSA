@@ -47,7 +47,7 @@ if opt.restore:
     print('loading checkpoint...\n',opt.restore)
     checkpoints = torch.load(opt.restore)
 
-all_spk_num=158
+all_spk_num=config.size_of_all_spks
 # cuda
 use_cuda = torch.cuda.is_available() and len(opt.gpus) > 0
 use_cuda = True
