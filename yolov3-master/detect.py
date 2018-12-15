@@ -80,7 +80,6 @@ def main(opt):
         with torch.no_grad():
             pred,features = model(torch.from_numpy(img).unsqueeze(0).to(device))
             print(features.size())
-            continue
 
             pred = pred[pred[:, :, 4] > opt.conf_thres]
 
