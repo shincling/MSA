@@ -111,13 +111,44 @@ class SPEECH_MODEL_1(nn.Module):
         print('speech shape final:', x.size(),'\n')
         return x
 
+class MERGE_MODEL(nn.Module):
+    def __init__(self, config,tgt_spk_size):
+        super(MERGE_MODEL, self).__init__()
+        self.tgt_spk_size = tgt_spk_size
+        self.config = config
+
+        self.sp_pool=nn.MaxPool2d((1,8))
+        self.sp_fc1=nn.Linear(1024,1024)
+        self.sp_fc2=nn.Linear(1024,1024)
+
+        self.im_conv1=nn.Conv2d(1024,1024,(1,1),stride=1,padding=(0,0),dilation=(1,1))
+        self.im_conv2=nn.Conv2d(1024,1024,(1,1),stride=1,padding=(0,0),dilation=(1,1))
+    def forward(self, image_hidden,speech_hidden):
+        #Image:[t,1024,13,13],Speech:[1,1024,t,8]
+        speech_hidden=self.sp_pool(speech_hidden).squeeze(-1) #[1,1024,t,1]-->[1,1024,t]
+        speech_hidden=torch.transpose(speech_hidden,1,2) # [1,t,1024]
+        speech_hidden=F.relu(self.sp_fc1(speech_hidden)) # [1,t,1024]
+        speech_final=F.relu(self.sp_fc2(speech_hidden)) # [1,t,1024]
+        print('Gets speech final: ',speech_final.shape)
+        speech_final=speech_final.squeeze() #[t,1024]
+        speech_final=speech_final.unsqueeze(1).unsqueeze(1) #[t,1,1,1024]
+        speech_final=speech_final.expand(1,13,13,-1) #[t,1,1,1024]
+        print('Gets speech final: ',speech_final.shape)
+
+        image_hidden=self.im_conv1(image_hidden)
+        image_final=self.im_conv2(image_hidden) #[t,1024,13,13]
+        # print('Gets image final: ',image_final.shape)
+        image_final=torch.transpose(torch.transpose(image_final,1,3),1,2) #[t,13,13,1024]
+        print('Gets image final: ',image_final.shape)
+
+
 class basic_model(nn.Module):
     def __init__(self, config,tgt_spk_size, use_cuda ):
         super(basic_model, self).__init__()
 
         self.speech_model=SPEECH_MODEL_1(config,)
         # self.images_model=IMAGES_MODEL(config,)
-        # self.output_model=MERGE_MODEL(config,)
+        self.output_model=MERGE_MODEL(config, tgt_spk_size)
         self.use_cuda = use_cuda
         self.tgt_spk_size = tgt_spk_size
         self.config = config
@@ -128,6 +159,7 @@ class basic_model(nn.Module):
         # Image:[t,1024,3,13],Speech:[4t,257,2]
 
         speech_hidden=self.speech_model(input_speech)
+        self.output_model(input_image,speech_hidden)
         1/0
 
 
