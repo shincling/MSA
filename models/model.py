@@ -56,12 +56,66 @@ class SPEECH_MODEL(nn.Module):
             print('speech shape after CNNs:',idx,'', x.size())
         return x
 
+class SPEECH_MODEL_1(nn.Module):
+    def __init__(self, config ):
+        super(SPEECH_MODEL_1, self).__init__()
+        self.cnn1=nn.Conv2d(2,64,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn1=nn.BatchNorm2d(64)
+        self.cnn2=nn.Conv2d(64,64,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn2=nn.BatchNorm2d(64)
+        self.pool2=nn.MaxPool2d((2,2))
+
+        self.cnn3=nn.Conv2d(64,128,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn3=nn.BatchNorm2d(128)
+        self.cnn4=nn.Conv2d(128,128,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn4=nn.BatchNorm2d(128)
+        self.pool4=nn.MaxPool2d((2,2))
+
+        self.cnn5=nn.Conv2d(128,256,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn5=nn.BatchNorm2d(256)
+        self.cnn6=nn.Conv2d(256,256,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn6=nn.BatchNorm2d(256)
+        self.pool6=nn.MaxPool2d((1,2))
+
+        self.cnn7=nn.Conv2d(256,512,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn7=nn.BatchNorm2d(512)
+        self.cnn8=nn.Conv2d(512,512,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn8=nn.BatchNorm2d(512)
+        self.pool8=nn.MaxPool2d((1,2))
+
+        self.cnn9=nn.Conv2d(512,1024,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn9=nn.BatchNorm2d(1024)
+        self.cnn10=nn.Conv2d(1024,1024,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn10=nn.BatchNorm2d(1024)
+        self.pool10=nn.MaxPool2d((1,2))
+
+        self.num_cnns=10
+        self.pool_list=[2,4,6,8,10]
+
+    def forward(self, x):
+        # Speech:[4t,257,2]
+        x=torch.transpose(torch.transpose(x,0,2),1,2).unsqueeze(0)
+        print(x.shape) #[bs=1, 2, 152, 257]
+        print('\nSpeech layer log:')
+        x = x.contiguous()
+        for idx in range(self.num_cnns):
+            cnn_layer=eval('self.cnn{}'.format(idx+1))
+            bn_layer=eval('self.bn{}'.format(idx+1))
+            x=F.relu(cnn_layer(x))
+            x=bn_layer(x)
+            if idx+1 in self.pool_list:
+                pool_layer=eval('self.pool{}'.format(idx+1))
+                x=pool_layer(x)
+            print('speech shape after CNNs:',idx,'', x.size())
+
+        print('speech shape final:', x.size(),'\n')
+        return x
 
 class basic_model(nn.Module):
     def __init__(self, config,tgt_spk_size, use_cuda ):
         super(basic_model, self).__init__()
 
-        self.speech_model=SPEECH_MODEL(config,)
+        self.speech_model=SPEECH_MODEL_1(config,)
         # self.images_model=IMAGES_MODEL(config,)
         # self.output_model=MERGE_MODEL(config,)
         self.use_cuda = use_cuda
