@@ -161,6 +161,7 @@ class MERGE_MODEL(nn.Module):
         print('Gets final feats: ',feats_final.shape)
 
 
+
 class basic_model(nn.Module):
     def __init__(self, config,tgt_spk_size, use_cuda ):
         super(basic_model, self).__init__()
@@ -174,13 +175,14 @@ class basic_model(nn.Module):
         self.loss_for_ss= nn.MSELoss()
         self.log_softmax = nn.LogSoftmax()
 
+        self.linear=nn.Linear(1024,tgt_spk_size)
+
     def forward(self,input_image,input_speech,):
         # Image:[t,1024,3,13],Speech:[4t,257,2]
 
         speech_hidden=self.speech_model(input_speech)
         feats_final=self.output_model(input_image,speech_hidden)
-        1/0
+        predict_scores=self.linear(feats_final)
 
-
-        return None
+        return predict_scores
 
