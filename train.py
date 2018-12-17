@@ -58,6 +58,7 @@ if use_cuda:
 print('building model...\n')
 model = model.basic_model(config, use_cuda, all_spk_num)
 
+loss_func=nn.CrossEntropyLoss()
 if opt.restore:
     model.load_state_dict(checkpoints['model'])
 
@@ -67,6 +68,7 @@ if use_cuda:
 if len(opt.gpus) > 1:
     model = nn.DataParallel(model, device_ids=opt.gpus, dim=1)
 
+updates=0
 # optimizer
 if  opt.restore:
     optim = checkpoints['optim']
@@ -80,13 +82,17 @@ else:
 
 # log file path
 if opt.log == '':
-    log_path = config.log + utils.format_time(time.localtime()) + '.log'
+    save_pat = config.log + utils.format_time(time.localtime())
+    if not os.path.exists(save_pat):
+        os.mkdir(save_pat)
+    log_path = save_pat + '/log'
 else:
     log_path = config.log + opt.log + '.log'
 logging = utils.logging(log_path) # 这种方式也值得学习，单独写一个logging的函数，直接调用，既print，又记录到Log文件里。
 
 # for k, v in [i for i in locals().items()]:
 #     logging("%s:\t%s\n" % (str(k), str(v)))
+utils.print_all(config,logging)
 logging("\n")
 logging(repr(model)+"\n\n")
 
@@ -101,17 +107,20 @@ def save_model(path):
     model_state_dict = model.module.state_dict() if len(opt.gpus) > 1 else model.state_dict()
     checkpoints = {
         'model': model_state_dict,
-        'config': config,
+        # 'config': config,
         'optim': optim,
         'updates': updates}
 
-    torch.save(checkpoints, path)
+    torch.save(checkpoints, path+'/{}_chechpoint.pt'.format(updates))
 
 def train(epoch,data):
+    global save_pat,updates
     print('*'*25,'Train epoch:',epoch,'*'*25)
     random.shuffle(data)
     print('First of data:',data[0])
     for idx,part in enumerate(data):
+        if idx%1000==0:
+            save_model(save_pat)
         speech_path,images_path,duration,spk_name=part['speech_path'],\
                                                   part['images_path'],\
                                                   part['duration'],part['spk_name']
@@ -137,9 +146,15 @@ def train(epoch,data):
         if use_cuda:
             images_feats=images_feats.cuda()
             speech_feats=speech_feats.cuda()
-        model(images_feats,speech_feats)
+        predict_score=model(images_feats,speech_feats)
 
-    return
+        target_spk=torch.tensor(config.spks_list.index(spk_name))
+        if use_cuda:
+            target_spk=target_spk.cuda().unsqueeze(0)
+
+        loss=loss_func(predict_score,target_spk)
+
+        print('loss this seq: ',loss)
 
 def eval(epoch,data):
     print('*'*25,'Eval epoch:',epoch,'*'*25)

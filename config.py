@@ -204,9 +204,9 @@ BGD_NOISE_FILE = 'Dataset_Multi/BGD_150203_010_STR.CH1.wav'
 Out_Sep_Result=True
 
 
-print('\n','*'*40)
-print('All the params:')
-print('*'*40)
-cc=locals().items()
-print(cc)
-print('*'*100,'\n')
+# print('\n','*'*40)
+# print('All the params:')
+# print('*'*40)
+# cc=locals().items()
+# print(cc)
+# print('*'*100,'\n')

@@ -43,7 +43,7 @@ def logging(file):
     def write_log(s):
         print(s,'')
         with open(file, 'a') as f:
-            f.write(s)
+            f.write(str(s))
     return write_log
 
 
@@ -59,6 +59,12 @@ def logging_csv(file):
 def format_time(t):
     return time.strftime("%Y-%m-%d-%H:%M:%S", t)
 
+def print_all(module_,log_func):
+  modulelist = dir(module_)
+  length = len(modulelist)
+  for i in range(0,length,1):
+    log_func(str(modulelist[i])+':::'+str(getattr(module_,modulelist[i])))
+    log_func('\n')
 
 def eval_metrics(reference, candidate, label_dict, log_path):
     ref_dir = log_path + 'reference/'
