@@ -10,6 +10,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.utils.data
 import numpy as np
+import lera
 
 import config
 import utils
@@ -76,9 +77,9 @@ else:
     optim = Optim(config.optim, config.learning_rate, config.max_grad_norm,
                   lr_decay=config.learning_rate_decay, start_decay_at=config.start_decay_at)
 
-# optim.set_parameters(model.parameters())
-# if config.schedule:
-#     scheduler = L.CosineAnnealingLR(optim.optimizer, T_max=config.epoch)
+optim.set_parameters(model.parameters())
+if config.schedule:
+    scheduler = L.CosineAnnealingLR(optim.optimizer, T_max=config.EPOCH_SIZE)
 
 # log file path
 if opt.log == '':
@@ -102,6 +103,13 @@ for param in model.parameters():
     param_count += param.view(-1).size()[0]
 logging('total number of parameters: %d\n\n' % param_count)
 
+total_loss_batch, start_time = 0, time.time()
+
+lera.log_hyperparams({
+    'title':'Meeting Secene Analysis V0.1',
+    'updates':updates,
+    'log path': log_path,
+})
 def save_model(path):
     global updates
     model_state_dict = model.module.state_dict() if len(opt.gpus) > 1 else model.state_dict()
@@ -114,13 +122,21 @@ def save_model(path):
     torch.save(checkpoints, path+'/{}_chechpoint.pt'.format(updates))
 
 def train(epoch,data):
-    global save_pat,updates
+    global save_pat,updates,total_loss_batch
     print('*'*25,'Train epoch:',epoch,'*'*25)
     random.shuffle(data)
     print('First of data:',data[0])
+
+    if config.schedule:
+        scheduler.step()
+        print("Decaying learning rate to %g" % scheduler.get_lr()[0])
+        lera.log(
+            'lr', scheduler.get_lr()[0]
+        )
+
+    loss_total=0.0
+    loss_grad_list=None
     for idx,part in enumerate(data):
-        if idx%1000==0:
-            save_model(save_pat)
         speech_path,images_path,duration,spk_name=part['speech_path'],\
                                                   part['images_path'],\
                                                   part['duration'],part['spk_name']
@@ -146,6 +162,8 @@ def train(epoch,data):
         if use_cuda:
             images_feats=images_feats.cuda()
             speech_feats=speech_feats.cuda()
+
+        model.zero_grad()
         predict_score=model(images_feats,speech_feats)
 
         target_spk=torch.tensor(config.spks_list.index(spk_name))
@@ -153,8 +171,32 @@ def train(epoch,data):
             target_spk=target_spk.cuda().unsqueeze(0)
 
         loss=loss_func(predict_score,target_spk)
+        if loss_grad_list is None:
+            loss_grad_list=loss
+        else:
+            loss_grad_list=loss_grad_list+loss
+        loss_total+=loss.data.cpu()[0].numpy()
+        total_loss_batch+=loss.data.cpu()[0].numpy()
 
-        print('loss this seq: ',loss)
+        print('loss this seq: ',loss.data[0].cpu().numpy())
+
+        if idx%5==0:
+            loss_grad_list.backward()
+            optim.step()
+            loss_grad_list=None # set to 0 every N samples.
+
+        updates += 1
+        if updates%200==0:
+            logging("time: %6.3f, epoch: %3d, updates: %8d, train loss this batch: %6.3f\n"
+                    % (time.time()-start_time, epoch, updates, total_loss_batch/200))
+            total_loss_batch=0
+
+        lera.log(
+            'loss',loss.data[0].cpu().numpy(),
+        )
+        if idx!=0 and idx%config.save_inter==0:
+            save_model(save_pat)
+    print('Loss aver for this batch:',loss_total/len(data))
 
 def eval(epoch,data):
     print('*'*25,'Eval epoch:',epoch,'*'*25)
@@ -177,7 +219,6 @@ def main():
             eval(i,eval_data)
     for metric in config.metric:
         logging("Best %s score: %.2f\n" % (metric, max(scores[metric])))
-
 
 if __name__ == '__main__':
     main()
