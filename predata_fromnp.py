@@ -130,7 +130,7 @@ def prepare_data(mode,train_or_test):
                 else:
                     continue
                 iidx,spk_name,start_time,end_time=id.split('_')
-                spk_all.append(spk_name)
+                # spk_all.append(spk_name)
                 all_list.append({
                     'speech_path':'/'.join([aim_meeting,view,id])+'_Audio.npy',
                     'images_path':'/'.join([aim_meeting,view,id])+'.npy',
