@@ -95,8 +95,8 @@ class SPEECH_MODEL_1(nn.Module):
     def forward(self, x):
         # Speech:[4t,257,2]
         x=torch.transpose(torch.transpose(x,0,2),1,2).unsqueeze(0)
-        print(x.shape) #[bs=1, 2, 152, 257]
-        print('\nSpeech layer log:')
+        # print(x.shape) #[bs=1, 2, 152, 257]
+        # print('\nSpeech layer log:')
         x = x.contiguous()
         for idx in range(self.num_cnns):
             cnn_layer=eval('self.cnn{}'.format(idx+1))
@@ -106,9 +106,9 @@ class SPEECH_MODEL_1(nn.Module):
             if idx+1 in self.pool_list:
                 pool_layer=eval('self.pool{}'.format(idx+1))
                 x=pool_layer(x)
-            print('speech shape after CNNs:',idx,'', x.size())
+            # print('speech shape after CNNs:',idx,'', x.size())
 
-        print('speech shape final:', x.size(),'\n')
+        # print('speech shape final:', x.size(),'\n')
         return x
 
 class MERGE_MODEL(nn.Module):
@@ -133,7 +133,7 @@ class MERGE_MODEL(nn.Module):
         speech_hidden=torch.transpose(speech_hidden,1,2) # [1,t,1024]
         speech_hidden=F.relu(self.sp_fc1(speech_hidden)) # [1,t,1024]
         speech_final=F.relu(self.sp_fc2(speech_hidden)) # [1,t,1024]
-        print('Gets speech final: ',speech_final.shape)
+        # print('Gets speech final: ',speech_final.shape)
         speech_final=speech_final.squeeze() #[t,1024]
         speech_final=speech_final.unsqueeze(1).unsqueeze(1) #[t,1,1,1024]
         speech_final=speech_final.expand(-1,config.image_size[0],config.image_size[1],-1) #[t,1,1,1024]
@@ -144,26 +144,27 @@ class MERGE_MODEL(nn.Module):
         image_final=self.im_conv2(image_hidden) #[t,1024,13,13]
         # print('Gets image final: ',image_final.shape)
         image_final=torch.transpose(torch.transpose(image_final,1,3),1,2) #[t,13,13,1024]
-        print('Gets image final: ',image_final.shape)
+        # print('Gets image final: ',image_final.shape)
         image_tmp=image_final.contiguous().view(-1,1,1024)
 
         mask=F.sigmoid(torch.bmm(image_tmp,speech_final).view(-1,config.image_size[0],config.image_size[1])).unsqueeze(1) #[t,1,13,13]
         mask=self.mask_conv(mask).squeeze().unsqueeze(-1) #[t,13,13,1]
-        print('Gets mask final: ',mask.shape)
+        # print('Gets mask final: ',mask.shape)
 
         images_masked=image_final*mask #[t,13,13,1024)
-        print('Gets masked images: ',images_masked.shape)
+        # print('Gets masked images: ',images_masked.shape)
         images_masked=torch.transpose(torch.transpose(images_masked,1,3),2,3) #[t,1024, 13,13]
         images_masked_aver=self.pool_over_size(images_masked).squeeze() #[t,1024]
-        print('Gets masked images aver: ',images_masked_aver.shape)
+        # print('Gets masked images aver: ',images_masked_aver.shape)
 
         feats_final=torch.mean(images_masked_aver,dim=0,keepdim=True) #[1,1024]
-        print('Gets final feats: ',feats_final.shape)
+        # print('Gets final feats: ',feats_final.shape)
 
+        return feats_final
 
 
 class basic_model(nn.Module):
-    def __init__(self, config,tgt_spk_size, use_cuda ):
+    def __init__(self, config, use_cuda,tgt_spk_size):
         super(basic_model, self).__init__()
 
         self.speech_model=SPEECH_MODEL_1(config,)
