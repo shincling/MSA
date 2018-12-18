@@ -10,6 +10,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.utils.data
 import numpy as np
+from sklearn import metrics
 import lera
 
 import config
@@ -24,7 +25,7 @@ parser = argparse.ArgumentParser(description='train.py')
 
 parser.add_argument('-config', default='config.py', type=str,
                     help="config file")
-parser.add_argument('-gpus', default=[2], nargs='+', type=int,
+parser.add_argument('-gpus', default=[1], nargs='+', type=int,
                     help="Use CUDA on the listed devices.")
 parser.add_argument('-restore', default=None, type=str,
                    help="restore checkpoint")
@@ -104,6 +105,7 @@ for param in model.parameters():
 logging('total number of parameters: %d\n\n' % param_count)
 
 total_loss_batch, start_time = 0, time.time()
+right_idx_everyXupdates = 0
 
 lera.log_hyperparams({
     'title':'Meeting Secene Analysis V0.1',
@@ -122,7 +124,7 @@ def save_model(path):
     torch.save(checkpoints, path+'/{}_chechpoint.pt'.format(updates))
 
 def train(epoch,data):
-    global save_pat,updates,total_loss_batch
+    global save_pat,updates,total_loss_batch,right_idx_everyXupdates
     print('*'*25,'Train epoch:',epoch,'*'*25)
     random.shuffle(data)
     print('First of data:',data[0])
@@ -135,6 +137,7 @@ def train(epoch,data):
         )
 
     loss_total=0.0
+    right_idx_per_epoch=0
     loss_grad_list=None
     for idx,part in enumerate(data):
         speech_path,images_path,duration,spk_name=part['speech_path'],\
@@ -165,8 +168,12 @@ def train(epoch,data):
 
         model.zero_grad()
         predict_score=model(images_feats,speech_feats)
+        predict_label=torch.argmax(predict_score,1).squeeze().item()
 
         target_spk=torch.tensor(config.spks_list.index(spk_name))
+        if predict_label==target_spk.item():
+            right_idx_per_epoch+=1
+            right_idx_everyXupdates+=1
         if use_cuda:
             target_spk=target_spk.cuda().unsqueeze(0)
 
@@ -186,17 +193,26 @@ def train(epoch,data):
             loss_grad_list=None # set to 0 every N samples.
 
         updates += 1
-        if updates%200==0:
-            logging("time: %6.3f, epoch: %3d, updates: %8d, train loss this batch: %6.3f\n"
-                    % (time.time()-start_time, epoch, updates, total_loss_batch/200))
+
+        # count every XXX updates
+        count_interval=200
+        if updates%count_interval==0: # count the performance every XXX updates
+            acc_this_interval=right_idx_everyXupdates/float(count_interval)
+            logging("time: %6.3f, epoch: %3d, updates: %8d, train loss this batch: %6.3f,acc this batch: %6.3f\n"
+                    % (time.time()-start_time, epoch, updates, total_loss_batch/float(count_interval),right_idx_everyXupdates/float(count_interval)))
             total_loss_batch=0
+            right_idx_everyXupdates=0
+            lera.log(
+                'Acc',acc_this_interval
+            )
 
         lera.log(
-            'loss',loss.data[0].cpu().numpy(),
+            'loss',loss.item(),
         )
         if idx!=0 and idx%config.save_inter==0:
             save_model(save_pat)
     print('Loss aver for this batch:',loss_total/len(data))
+    print('Acc aver for this batch:',right_idx_per_epoch/float(len(data)))
 
 def eval(epoch,data):
     print('*'*25,'Eval epoch:',epoch,'*'*25)
