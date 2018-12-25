@@ -25,10 +25,13 @@ parser = argparse.ArgumentParser(description='train.py')
 
 parser.add_argument('-config', default='config.py', type=str,
                     help="config file")
-parser.add_argument('-gpus', default=[1], nargs='+', type=int,
+parser.add_argument('-gpus', default=[0], nargs='+', type=int,
                     help="Use CUDA on the listed devices.")
-parser.add_argument('-restore', default=None, type=str,
-                   help="restore checkpoint")
+# parser.add_argument('-restore', default='8ups_lowlr_50000.pt', type=str,
+parser.add_argument('-restore', default='70000_chechpoint.pt', type=str,
+                    help="restore checkpoint")
+# parser.add_argument('-restore', default=None, type=str,
+#                    help="restore checkpoint")
 parser.add_argument('-seed', type=int, default=1234,
                     help="Random seed")
 parser.add_argument('-model', default='model', type=str,
@@ -71,8 +74,10 @@ if len(opt.gpus) > 1:
     model = nn.DataParallel(model, device_ids=opt.gpus, dim=1)
 
 updates=0
+if opt.restore:
+    updates = checkpoints['updates']
 # optimizer
-if  opt.restore:
+if 0 and opt.restore:
     optim = checkpoints['optim']
 else:
     optim = Optim(config.optim, config.learning_rate, config.max_grad_norm,
@@ -89,7 +94,10 @@ if opt.log == '':
         os.mkdir(save_pat)
     log_path = save_pat + '/log'
 else:
-    log_path = config.log + opt.log + '.log'
+    save_pat = config.log + opt.log + '_' + utils.format_time(time.localtime())
+    if not os.path.exists(save_pat):
+        os.mkdir(save_pat)
+    log_path = save_pat + '/log'
 logging = utils.logging(log_path) # 这种方式也值得学习，单独写一个logging的函数，直接调用，既print，又记录到Log文件里。
 
 # for k, v in [i for i in locals().items()]:
@@ -167,8 +175,12 @@ def train(epoch,data):
             speech_feats=speech_feats.cuda()
 
         model.zero_grad()
-        predict_score=model(images_feats,speech_feats)
-        predict_label=torch.argmax(predict_score,1).squeeze().item()
+        try:
+            predict_score=model(images_feats,speech_feats)
+            predict_label=torch.argmax(predict_score,1).squeeze().item()
+        except Exception as RR:
+            print('EEE errors here: ',RR)
+            continue
 
         target_spk=torch.tensor(config.spks_list.index(spk_name))
         if predict_label==target_spk.item():
@@ -181,13 +193,24 @@ def train(epoch,data):
         if loss_grad_list is None:
             loss_grad_list=loss
         else:
+            # print(next(model.parameters()).grad)
+
             loss_grad_list=loss_grad_list+loss
+            # pass
+
+            # loss_grad_list.backward()
+            # print(next(model.parameters()).grad[0])
         loss_total+=loss.data.cpu()[0].numpy()
         total_loss_batch+=loss.data.cpu()[0].numpy()
 
         print('loss this seq: ',loss.data[0].cpu().numpy())
+        # if loss.item()<1.2:
+        #     print('Low loss in: ',part)
+        #     lera.log(
+        #         'Low loss length', duration
+        #     )
 
-        if idx%5==0:
+        if 1 and idx%8==0:
             loss_grad_list.backward()
             optim.step()
             loss_grad_list=None # set to 0 every N samples.
@@ -209,10 +232,10 @@ def train(epoch,data):
         lera.log(
             'loss',loss.item(),
         )
-        if idx!=0 and idx%config.save_inter==0:
+        if updates%config.save_inter==0:
             save_model(save_pat)
-    print('Loss aver for this batch:',loss_total/len(data))
-    print('Acc aver for this batch:',right_idx_per_epoch/float(len(data)))
+    print('Loss aver for this epoch:',loss_total/len(data))
+    print('Acc aver for this epoch:',right_idx_per_epoch/float(len(data)))
 
 def eval(epoch,data):
     print('*'*25,'Eval epoch:',epoch,'*'*25)

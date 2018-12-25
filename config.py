@@ -109,7 +109,9 @@ spks_list=['FEE005', 'FEE013', 'FEE016', 'FEE019', 'FEE021', 'FEE024', 'FEE028',
 
 
 optim = 'adam'
-learning_rate = 0.002
+# optim = 'adagrad'
+learning_rate = 0.0002
+learning_rate = 0.00005
 max_grad_norm = 10
 learning_rate_decay = 0.5
 save_inter=10000
