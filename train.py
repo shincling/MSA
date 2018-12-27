@@ -19,16 +19,20 @@ from optims import Optim
 import lr_scheduler as L
 from models import model
 from predata_fromnp import prepare_data
+from heatmap import draw_map
 
 #config
 parser = argparse.ArgumentParser(description='train.py')
 
 parser.add_argument('-config', default='config.py', type=str,
                     help="config file")
-parser.add_argument('-gpus', default=[0], nargs='+', type=int,
+parser.add_argument('-gpus', default=[1], nargs='+', type=int,
                     help="Use CUDA on the listed devices.")
 # parser.add_argument('-restore', default='8ups_lowlr_50000.pt', type=str,
-parser.add_argument('-restore', default='70000_chechpoint.pt', type=str,
+# parser.add_argument('-restore', default='70000_chechpoint.pt', type=str,
+# parser.add_argument('-restore', default='130000_chechpoint.pt', type=str,
+
+parser.add_argument('-restore', default='10000_tmp_chechpoint.pt', type=str,
                     help="restore checkpoint")
 # parser.add_argument('-restore', default=None, type=str,
 #                    help="restore checkpoint")
@@ -65,6 +69,9 @@ model = model.basic_model(config, use_cuda, all_spk_num)
 
 loss_func=nn.CrossEntropyLoss()
 if opt.restore:
+    if not config.mask_conv_bias:
+        if 'output_model.mask_conv.bias' in checkpoints['model']:
+            checkpoints['model'].pop('output_model.mask_conv.bias')
     model.load_state_dict(checkpoints['model'])
 
 if use_cuda:
@@ -116,9 +123,12 @@ total_loss_batch, start_time = 0, time.time()
 right_idx_everyXupdates = 0
 
 lera.log_hyperparams({
-    'title':'Meeting Secene Analysis V0.1',
+    'title':'MSC v0.1c relu after mask, then sigmoid',
     'updates':updates,
     'log path': log_path,
+    'mask_softmax:': config.mask_softmax,
+    'image time conv': config.image_time_conv,
+    'mask_conv_bias': config.mask_conv_bias,
 })
 def save_model(path):
     global updates
@@ -129,7 +139,11 @@ def save_model(path):
         'optim': optim,
         'updates': updates}
 
-    torch.save(checkpoints, path+'/{}_chechpoint.pt'.format(updates))
+    if not config.image_time_conv:
+        torch.save(checkpoints, path+'/{}_chechpoint.pt'.format(updates))
+    else:
+        torch.save(checkpoints, path+'/{}_tmp_chechpoint.pt'.format(updates))
+
 
 def train(epoch,data):
     global save_pat,updates,total_loss_batch,right_idx_everyXupdates
@@ -174,9 +188,9 @@ def train(epoch,data):
             images_feats=images_feats.cuda()
             speech_feats=speech_feats.cuda()
 
-        model.zero_grad()
         try:
-            predict_score=model(images_feats,speech_feats)
+            model.zero_grad()
+            predict_score,mask=model(images_feats,speech_feats)
             predict_label=torch.argmax(predict_score,1).squeeze().item()
         except Exception as RR:
             print('EEE errors here: ',RR)
@@ -196,7 +210,7 @@ def train(epoch,data):
             # print(next(model.parameters()).grad)
 
             loss_grad_list=loss_grad_list+loss
-            # pass
+            pass
 
             # loss_grad_list.backward()
             # print(next(model.parameters()).grad[0])
@@ -204,13 +218,18 @@ def train(epoch,data):
         total_loss_batch+=loss.data.cpu()[0].numpy()
 
         print('loss this seq: ',loss.data[0].cpu().numpy())
-        # if loss.item()<1.2:
+        # if loss.item()<1.2 and 'Overview' in images_path:
         #     print('Low loss in: ',part)
-        #     lera.log(
-        #         'Low loss length', duration
-        #     )
+        #     draw_map(images_path,mask.data.cpu().numpy())
+        #     1/0
+        # else:
+        #     continue
 
-        if 1 and idx%8==0:
+            # lera.log(
+            #     'Low loss length', duration
+            # )
+
+        if 1 and idx%6==0:
             loss_grad_list.backward()
             optim.step()
             loss_grad_list=None # set to 0 every N samples.
