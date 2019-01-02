@@ -26,16 +26,22 @@ parser = argparse.ArgumentParser(description='train.py')
 
 parser.add_argument('-config', default='config.py', type=str,
                     help="config file")
-parser.add_argument('-gpus', default=[1], nargs='+', type=int,
+parser.add_argument('-gpus', default=[3], nargs='+', type=int,
                     help="Use CUDA on the listed devices.")
 # parser.add_argument('-restore', default='8ups_lowlr_50000.pt', type=str,
 # parser.add_argument('-restore', default='70000_chechpoint.pt', type=str,
 # parser.add_argument('-restore', default='130000_chechpoint.pt', type=str,
 
-parser.add_argument('-restore', default='10000_tmp_chechpoint.pt', type=str,
-                    help="restore checkpoint")
+parser.add_argument('-restore', default='30000_tmp_chechpoint.pt', type=str,
+# parser.add_argument('-restore', default='20000_tmp_chechpoint_v2.pt', type=str,
+# parser.add_argument('-restore', default='50000_tmp_chechpoint_v2.pt', type=str,
+
+# parser.add_argument('-restore', default='50000_chechpoint.pt', type=str,
+
+# parser.add_argument('-restore', default='60000_tmp_chechpoint_only1.pt', type=str,
+
 # parser.add_argument('-restore', default=None, type=str,
-#                    help="restore checkpoint")
+                   help="restore checkpoint")
 parser.add_argument('-seed', type=int, default=1234,
                     help="Random seed")
 parser.add_argument('-model', default='model', type=str,
@@ -123,12 +129,14 @@ total_loss_batch, start_time = 0, time.time()
 right_idx_everyXupdates = 0
 
 lera.log_hyperparams({
-    'title':'MSC v0.1c relu after mask, then sigmoid',
+    'title':'MSC v0.1c relu after mask, then tanh',
     'updates':updates,
     'log path': log_path,
     'mask_softmax:': config.mask_softmax,
     'image time conv': config.image_time_conv,
     'mask_conv_bias': config.mask_conv_bias,
+    'mask_over_init': config.mask_over_init,
+    'only 1 meet:':config.only_1_meet
 })
 def save_model(path):
     global updates
@@ -184,57 +192,71 @@ def train(epoch,data):
         print('Enter into the model:',images_feats.shape,speech_feats.shape)
         images_feats=Variable(torch.tensor(images_feats))
         speech_feats=Variable(torch.tensor(speech_feats))
-        if use_cuda:
-            images_feats=images_feats.cuda()
-            speech_feats=speech_feats.cuda()
 
         try:
+            if use_cuda:
+                images_feats=images_feats.cuda()
+                speech_feats=speech_feats.cuda()
             model.zero_grad()
             predict_score,mask=model(images_feats,speech_feats)
-            predict_label=torch.argmax(predict_score,1).squeeze().item()
-        except Exception as RR:
+            if not config.class_frame:
+                predict_label=torch.argmax(predict_score,1).squeeze().item()
+            else:
+                #这是在一共t个帧里
+                predict_idx=torch.argmax(predict_score).item()
+                predict_label=predict_idx%len(config.spks_list)
+
+            target_spk=torch.tensor(config.spks_list.index(spk_name))
+            if config.class_frame:
+                target_spk=target_spk.expand(images_feats.shape[0])
+
+            if predict_label==config.spks_list.index(spk_name):
+                right_idx_per_epoch+=1
+                right_idx_everyXupdates+=1
+            if use_cuda:
+                target_spk=target_spk.cuda()
+                if not config.class_frame:
+                    target_spk=target_spk.unsqueeze(0)
+
+            loss=loss_func(predict_score,target_spk)
+            if loss_grad_list is None:
+                loss_grad_list=loss
+            else:
+                # print(next(model.parameters()).grad)
+
+                loss_grad_list=loss_grad_list+loss
+                pass
+
+                # loss_grad_list.backward()
+                # print(next(model.parameters()).grad[0])
+            loss_total+=loss.item()
+            total_loss_batch+=loss.item()
+
+            print('loss this seq: ',loss.item())
+            # if loss.item()<1.1 and 'Overview' in images_path :
+            # if loss.item()<1.5 and 'Corner' not in images_path:
+            #     print('Low loss in: ',part)
+            #     draw_map(images_path,mask.data.cpu().numpy())
+            #     1/0
+
+            # else:
+            #     continue
+
+                # lera.log(
+                #     'Low loss length', duration
+                # )
+
+            if 1 and idx%8==0:
+                loss_grad_list.backward()
+                optim.step()
+                loss_grad_list=None # set to 0 every N samples.
+
+            updates += 1
+
+        except  RuntimeError as RR:
             print('EEE errors here: ',RR)
-            continue
-
-        target_spk=torch.tensor(config.spks_list.index(spk_name))
-        if predict_label==target_spk.item():
-            right_idx_per_epoch+=1
-            right_idx_everyXupdates+=1
-        if use_cuda:
-            target_spk=target_spk.cuda().unsqueeze(0)
-
-        loss=loss_func(predict_score,target_spk)
-        if loss_grad_list is None:
-            loss_grad_list=loss
-        else:
-            # print(next(model.parameters()).grad)
-
-            loss_grad_list=loss_grad_list+loss
-            pass
-
-            # loss_grad_list.backward()
-            # print(next(model.parameters()).grad[0])
-        loss_total+=loss.data.cpu()[0].numpy()
-        total_loss_batch+=loss.data.cpu()[0].numpy()
-
-        print('loss this seq: ',loss.data[0].cpu().numpy())
-        # if loss.item()<1.2 and 'Overview' in images_path:
-        #     print('Low loss in: ',part)
-        #     draw_map(images_path,mask.data.cpu().numpy())
-        #     1/0
-        # else:
-        #     continue
-
-            # lera.log(
-            #     'Low loss length', duration
-            # )
-
-        if 1 and idx%6==0:
-            loss_grad_list.backward()
-            optim.step()
             loss_grad_list=None # set to 0 every N samples.
-
-        updates += 1
+            continue
 
         # count every XXX updates
         count_interval=200
@@ -268,6 +290,8 @@ def main():
         if not opt.notrain:
             if not train_data:
                 train_data=prepare_data('once','train')
+                if config.only_1_meet:
+                    train_data=[i for i in train_data if 'TS3005c' in i['speech_path']]
                 print('Train data gets items of: ',len(train_data))
             train(i,train_data)
         else:

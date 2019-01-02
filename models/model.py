@@ -183,6 +183,7 @@ class MERGE_MODEL_1(nn.Module):
             self.image_time_conv=nn.Conv1d(1024,1024,5,stride=1,padding=2,dilation=1,groups=1024)
         # self.pool_over_size=nn.AvgPool2d((config.image_size[0],config.image_size[1]))
         self.pool_over_size=nn.MaxPool2d((config.image_size[0],config.image_size[1]))
+
     def forward(self, image_hidden,speech_hidden):
         config=self.config
         #Image:[t,1024,13,13],Speech:[1,1024,t,8]
@@ -201,8 +202,9 @@ class MERGE_MODEL_1(nn.Module):
             image_hidden_tmp=image_hidden.view(-1,1024,config.image_size[0]*config.image_size[1]).transpose(0,2)  #[13*13,1024,t]
             image_hidden_tmp=self.image_time_conv(image_hidden_tmp)#[13*13,1024,t]
             image_hidden_tmp=image_hidden_tmp.transpose(0,2).view(-1,1024,config.image_size[0],config.image_size[1])
-
-        image_hidden_tmp=F.relu(self.im_conv1(image_hidden_tmp))
+            image_hidden_tmp=F.relu(self.im_conv1(image_hidden_tmp))
+        else:
+            image_hidden_tmp=F.relu(self.im_conv1(image_hidden))
         image_final=F.relu(self.im_conv2(image_hidden_tmp)) #[t,1024,13,13]
         # print('Gets image final: ',image_final.shape)
         image_final=torch.transpose(torch.transpose(image_final,1,3),1,2) #[t,13,13,1024]
@@ -211,7 +213,7 @@ class MERGE_MODEL_1(nn.Module):
 
         mask=torch.bmm(image_tmp,speech_final).view(-1,config.image_size[0],config.image_size[1]).unsqueeze(1) #[t,1,13,13]
         if config.mask_softmax:
-            mask=self.mask_conv(mask).squeeze() #[t,13,13]
+            mask=F.relu(self.mask_conv(mask).squeeze()) #[t,13,13]
             mask=mask.view(-1,config.image_size[0]*config.image_size[1]) #[t,13*13]
             mask=F.softmax(mask,dim=1) #[t,13*13]
             mask=mask.view(-1,config.image_size[0],config.image_size[1],1)#[t,13,13,1]
@@ -221,13 +223,21 @@ class MERGE_MODEL_1(nn.Module):
             mask=F.tanh(F.relu(self.mask_conv(mask).squeeze().unsqueeze(-1))) #[t,13,13,1]
         # print('Gets mask final: ',mask.shape)
 
-        images_masked=image_final*mask #[t,13,13,1024)
+        if not config.mask_over_init:
+            images_masked=image_final*mask #[t,13,13,1024)
+        else:
+            image_hidden=torch.transpose(torch.transpose(image_hidden,1,3),1,2) #[t,13,13,1024]
+            images_masked=image_hidden*mask #[t,13,13,1024)
+
         # print('Gets masked images: ',images_masked.shape)
         images_masked=torch.transpose(torch.transpose(images_masked,1,3),2,3) #[t,1024, 13,13]
         images_masked_aver=self.pool_over_size(images_masked).squeeze() #[t,1024]
         # print('Gets masked images aver: ',images_masked_aver.shape)
 
-        feats_final=torch.mean(images_masked_aver,dim=0,keepdim=True) #[1,1024]
+        if not config.class_frame:
+            feats_final=torch.mean(images_masked_aver,dim=0,keepdim=True) #[1,1024]
+        else:
+            feats_final=images_masked_aver
         # print('Gets final feats: ',feats_final.shape)
 
         return feats_final,mask
