@@ -1,10 +1,11 @@
 #coding=utf8
 import os
+import shutil
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 def draw_map(data_path,mask_seq):
-    os.rmdir('visions/')
+    shutil.rmtree('visions/')
     os.mkdir('visions/')
     mask_seq=mask_seq[:,:,:,0]
     frames=mask_seq.shape[0]
