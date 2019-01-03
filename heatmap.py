@@ -3,6 +3,7 @@ import os
 import shutil
 import seaborn as sns
 import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 
 def draw_map(data_path,mask_seq):
     shutil.rmtree('visions/')
