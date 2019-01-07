@@ -4,6 +4,7 @@ import time
 import random
 # import collections
 # import lera
+from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -26,13 +27,13 @@ parser = argparse.ArgumentParser(description='train.py')
 
 parser.add_argument('-config', default='config.py', type=str,
                     help="config file")
-parser.add_argument('-gpus', default=[3], nargs='+', type=int,
+parser.add_argument('-gpus', default=[2], nargs='+', type=int,
                     help="Use CUDA on the listed devices.")
 # parser.add_argument('-restore', default='8ups_lowlr_50000.pt', type=str,
 # parser.add_argument('-restore', default='70000_chechpoint.pt', type=str,
 # parser.add_argument('-restore', default='130000_chechpoint.pt', type=str,
 
-parser.add_argument('-restore', default='30000_tmp_chechpoint.pt', type=str,
+# parser.add_argument('-restore', default='30000_tmp_chechpoint.pt', type=str,
 # parser.add_argument('-restore', default='20000_tmp_chechpoint_v2.pt', type=str,
 # parser.add_argument('-restore', default='50000_tmp_chechpoint_v2.pt', type=str,
 
@@ -40,6 +41,12 @@ parser.add_argument('-restore', default='30000_tmp_chechpoint.pt', type=str,
 
 # parser.add_argument('-restore', default='60000_tmp_chechpoint_only1.pt', type=str,
 
+# parser.add_argument('-restore', default='tmp_perfect_5000.pt', type=str,
+# parser.add_argument('-restore', default='tinyv3_15000.pt', type=str,
+# parser.add_argument('-restore', default='tinyv4_15000.pt', type=str,
+# parser.add_argument('-restore', default='tinyv5_65000.pt', type=str,
+# parser.add_argument('-restore', default='tinyv8_10000.pt', type=str,
+parser.add_argument('-restore', default='tinyv9_410000.pt', type=str,
 # parser.add_argument('-restore', default=None, type=str,
                    help="restore checkpoint")
 parser.add_argument('-seed', type=int, default=1234,
@@ -60,7 +67,10 @@ torch.manual_seed(opt.seed)
 # checkpoint
 if opt.restore:
     print('loading checkpoint...\n',opt.restore)
-    checkpoints = torch.load(opt.restore)
+    # checkpoints = torch.load(opt.restore,map_location={'cuda:0':'cuda:2'})
+    # checkpoints = torch.load(opt.restore,map_location={'cuda:3':'cuda:1'})
+    checkpoints = torch.load(opt.restore,map_location='cpu')
+    # checkpoints = torch.load(opt.restore)
 
 all_spk_num=config.size_of_all_spks
 # cuda
@@ -90,7 +100,7 @@ updates=0
 if opt.restore:
     updates = checkpoints['updates']
 # optimizer
-if 0 and opt.restore:
+if 1 and opt.restore:
     optim = checkpoints['optim']
 else:
     optim = Optim(config.optim, config.learning_rate, config.max_grad_norm,
@@ -136,7 +146,11 @@ lera.log_hyperparams({
     'image time conv': config.image_time_conv,
     'mask_conv_bias': config.mask_conv_bias,
     'mask_over_init': config.mask_over_init,
-    'only 1 meet:':config.only_1_meet
+    'only 1 meet:':config.only_1_meet,
+    'class_frame:':config.class_frame,
+    'mask threshold:':config.threshold,
+    'masktopk:':config.mask_topk,
+    'size sum:':config.size_sum,
 })
 def save_model(path):
     global updates
@@ -224,7 +238,7 @@ def train(epoch,data):
             else:
                 # print(next(model.parameters()).grad)
 
-                loss_grad_list=loss_grad_list+loss
+                # loss_grad_list=loss_grad_list+loss
                 pass
 
                 # loss_grad_list.backward()
@@ -233,20 +247,21 @@ def train(epoch,data):
             total_loss_batch+=loss.item()
 
             print('loss this seq: ',loss.item())
-            # if loss.item()<1.1 and 'Overview' in images_path :
+            if loss.item()<0.2 and 'Overview' in images_path and 1.4<duration<3:
             # if loss.item()<1.5 and 'Corner' not in images_path:
-            #     print('Low loss in: ',part)
-            #     draw_map(images_path,mask.data.cpu().numpy())
-            #     1/0
-
-            # else:
-            #     continue
+                print('Low loss in: ',part)
+                draw_map(images_path,mask.data.cpu().numpy())
+                pass
+                # 1/0
+                # input('Print to the next...')
+            else:
+                continue
 
                 # lera.log(
                 #     'Low loss length', duration
                 # )
 
-            if 1 and idx%8==0:
+            if 0 and idx%8==0:
                 loss_grad_list.backward()
                 optim.step()
                 loss_grad_list=None # set to 0 every N samples.
@@ -269,6 +284,12 @@ def train(epoch,data):
             lera.log(
                 'Acc',acc_this_interval
             )
+            draw_map(images_path,mask.data.cpu().numpy())
+            img_obj=Image.open('visions/sns_heatmap_normal_7.jpg')
+            lera.log_image('mask',img_obj)
+            img_obj=Image.open(config.aim_path+images_path[:-4]+'/'+images_path.split('/')[-1][:-4]+'_000007.jpeg')
+            lera.log_image('image',img_obj)
+            del img_obj
 
         lera.log(
             'loss',loss.item(),
