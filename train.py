@@ -285,10 +285,14 @@ def train(epoch,data):
                 'Acc',acc_this_interval
             )
             draw_map(images_path,mask.data.cpu().numpy())
-            img_obj=Image.open('visions/sns_heatmap_normal_7.jpg')
-            lera.log_image('mask',img_obj)
-            img_obj=Image.open(config.aim_path+images_path[:-4]+'/'+images_path.split('/')[-1][:-4]+'_000007.jpeg')
-            lera.log_image('image',img_obj)
+            if config.class_frame:
+                max_frame_idx=int(predict_idx/len(config.spks_list))+1
+            else:
+                max_frame_idx=7
+            img_obj=Image.open('visions/sns_heatmap_normal_{}.jpg'.format(max_frame_idx))
+            lera.log_image('mask_',img_obj)
+            img_obj=Image.open(config.aim_path+images_path[:-4]+'/'+images_path.split('/')[-1][:-4]+'_{}.jpeg'.format("%06d"%max_frame_idx))
+            lera.log_image('image_',img_obj)
             del img_obj
 
         lera.log(
