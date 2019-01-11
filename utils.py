@@ -197,7 +197,7 @@ def random_affine(img, targets=None, degrees=(-10, 10), translate=(.1, .1), scal
         return imw
 
 class load_images():  # for training
-    def __init__(self, path, batch_size=1, img_size=32*13, multi_scale=False, augment=False):
+    def __init__(self, path, batch_size=1, img_size=16*13, multi_scale=False, augment=False):
         self.path = path
         # self.img_files = sorted(glob.glob('%s/*.*' % path))
         # with open(path, 'r') as file:
