@@ -56,6 +56,60 @@ class SPEECH_MODEL(nn.Module):
             print('speech shape after CNNs:',idx,'', x.size())
         return x
 
+class IMAGE_MODEL(nn.Module):
+    def __init__(self,config):
+        super(IMAGE_MODEL, self).__init__()
+        self.cnn1=nn.Conv2d(3,64,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn1=nn.BatchNorm2d(64)
+        self.cnn2=nn.Conv2d(64,64,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn2=nn.BatchNorm2d(64)
+        self.pool2=nn.MaxPool2d((2,2))
+
+        self.cnn3=nn.Conv2d(64,128,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn3=nn.BatchNorm2d(128)
+        self.cnn4=nn.Conv2d(128,128,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn4=nn.BatchNorm2d(128)
+        self.pool4=nn.MaxPool2d((2,2))
+
+        self.cnn5=nn.Conv2d(128,256,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn5=nn.BatchNorm2d(256)
+        self.cnn6=nn.Conv2d(256,256,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn6=nn.BatchNorm2d(256)
+        self.pool6=nn.MaxPool2d((2,2))
+
+        self.cnn7=nn.Conv2d(256,512,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn7=nn.BatchNorm2d(512)
+        self.cnn8=nn.Conv2d(512,512,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn8=nn.BatchNorm2d(512)
+        self.pool8=nn.MaxPool2d((2,2))
+
+        self.cnn9=nn.Conv2d(512,1024,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn9=nn.BatchNorm2d(1024)
+        self.cnn10=nn.Conv2d(1024,1024,(3,3),stride=1,padding=(1,1),dilation=(1,1))
+        self.bn10=nn.BatchNorm2d(1024)
+        # self.pool10=nn.MaxPool2d((2,2))
+
+        self.num_cnns=10
+        self.pool_list=[2,4,6,8]
+
+    def forward(self, x):
+        # IMAGE:[4t,3,416,416]
+        print(x.shape)
+        print('\nImage layer log:')
+        x = x.contiguous()
+        for idx in range(self.num_cnns):
+            cnn_layer=eval('self.cnn{}'.format(idx+1))
+            bn_layer=eval('self.bn{}'.format(idx+1))
+            x=F.relu(cnn_layer(x))
+            x=bn_layer(x)
+            if idx+1 in self.pool_list:
+                pool_layer=eval('self.pool{}'.format(idx+1))
+                x=pool_layer(x)
+            print('Image shape after CNNs:',idx,'', x.size())
+
+        print('Image shape final:', x.size(),'\n')
+        return x
+
 class SPEECH_MODEL_1(nn.Module):
     def __init__(self, config ):
         super(SPEECH_MODEL_1, self).__init__()
@@ -203,15 +257,49 @@ class MERGE_MODEL_1(nn.Module):
             image_hidden_tmp=self.image_time_conv(image_hidden_tmp)#[13*13,1024,t]
             image_hidden_tmp=image_hidden_tmp.transpose(0,2).view(-1,1024,config.image_size[0],config.image_size[1])
             image_hidden_tmp=F.relu(self.im_conv1(image_hidden_tmp))
+        # elif config.images_recu:
+        #     image_hidden_tmp=torch.zeros_like(image_hidden)
+            # print('image original:')
+            # print(image_hidden[0,10])
+            # print(image_hidden[1,10])
+            # for idx,frame in enumerate(image_hidden[:-1]):
+            #     image_hidden_tmp[idx]=image_hidden[idx+1]-frame
+            # print('image after:')
+            # print(image_hidden_tmp[0,10])
+            # print(image_hidden_tmp[1,10])
         else:
             image_hidden_tmp=F.relu(self.im_conv1(image_hidden))
         image_final=F.relu(self.im_conv2(image_hidden_tmp)) #[t,1024,13,13]
-        # print('Gets image final: ',image_final.shape)
-        image_final=torch.transpose(torch.transpose(image_final,1,3),1,2) #[t,13,13,1024]
-        # print('Gets image final: ',image_final.shape)
-        image_tmp=image_final.contiguous().view(-1,1,1024)
+        if config.images_recu:
+            image_final_tmp = torch.zeros_like(image_final)
+            for idx, frame in enumerate(image_final[:-1]):
+                image_final_tmp[idx] = image_final[idx + 1] - frame
+            # print('Gets image final: ',image_final.shape)
+            image_final_tmp = torch.transpose(torch.transpose(image_final_tmp, 1, 3), 1, 2)  # [t,13,13,1024]
+            # print('Gets image final: ',image_final.shape)
+            image_tmp = image_final_tmp.contiguous().view(-1, 1, 1024)
+            image_final = torch.transpose(torch.transpose(image_final, 1, 3), 1, 2)  # [t,13,13,1024]
+        else:
+            # print('Gets image final: ',image_final.shape)
+            image_final = torch.transpose(torch.transpose(image_final, 1, 3), 1, 2)  # [t,13,13,1024]
+            # print('Gets image final: ',image_final.shape)
+            image_tmp = image_final.contiguous().view(-1, 1, 1024)
 
         mask=torch.bmm(image_tmp,speech_final).view(-1,config.image_size[0],config.image_size[1]).unsqueeze(1) #[t,1,13,13]
+        if config.mask_norm:
+            # mask=F.normalize(mask,dim=0)
+
+            mask=F.normalize(mask.view(-1,config.image_size[0]*config.image_size[1])).view(-1,1,config.image_size[0],config.image_size[1])
+            # for idx,each_frame in enumerate(mask):
+            #     mask[idx]=mask[idx]/torch.max(each_frame)
+        if config.threshold:
+            mask = F.threshold(mask, config.threshold, 0)
+        if config.mask_topk:
+            mask_plan = mask.squeeze().view(-1,config.image_size[0]*config.image_size[1]) #t,13*13
+            kth_value = torch.topk(mask_plan,config.mask_topk,dim=1)[0][:,-1].unsqueeze(-1) #t,1
+            kth_value_map = kth_value.expand(-1,config.image_size[0]*config.image_size[1]) # t,169
+            mask = ((mask_plan>=kth_value_map).float()*mask_plan).view(-1,config.image_size[0],config.image_size[1])
+
         if config.mask_softmax:
             mask=F.relu(self.mask_conv(mask).squeeze()) #[t,13,13]
             mask=mask.view(-1,config.image_size[0]*config.image_size[1]) #[t,13*13]
@@ -220,7 +308,8 @@ class MERGE_MODEL_1(nn.Module):
         else:
             # mask=F.sigmoid(self.mask_conv(mask).squeeze().unsqueeze(-1)) #[t,13,13,1]
             # 用Tanh的好处在于，之前算出来的score是0的，就他妈是0,别让sigmoid再注册个0.5的值进去捣乱了。
-            mask=F.tanh(F.relu(self.mask_conv(mask).squeeze().unsqueeze(-1))) #[t,13,13,1]
+            # mask=F.tanh(F.relu(self.mask_conv(mask).squeeze().unsqueeze(-1))) #[t,13,13,1]
+            mask=mask.squeeze().unsqueeze(-1) #[t,13,13,1]
         # print('Gets mask final: ',mask.shape)
 
         if not config.mask_over_init:
@@ -231,7 +320,10 @@ class MERGE_MODEL_1(nn.Module):
 
         # print('Gets masked images: ',images_masked.shape)
         images_masked=torch.transpose(torch.transpose(images_masked,1,3),2,3) #[t,1024, 13,13]
-        images_masked_aver=self.pool_over_size(images_masked).squeeze() #[t,1024]
+        if not config.size_sum:
+            images_masked_aver=self.pool_over_size(images_masked).squeeze() #[t,1024]
+        else:
+            images_masked_aver=images_masked.view(-1,1024,config.image_size[0]*config.image_size[1]).sum(2)#[t,1024]
         # print('Gets masked images aver: ',images_masked_aver.shape)
 
         if not config.class_frame:
@@ -267,3 +359,28 @@ class basic_model(nn.Module):
 
         return predict_scores,masks
 
+class raw_model(nn.Module):
+    def __init__(self, config, use_cuda,tgt_spk_size):
+        super(raw_model, self).__init__()
+
+        self.speech_model=SPEECH_MODEL_1(config,)
+        self.images_model=IMAGE_MODEL(config,)
+        # self.output_model=MERGE_MODEL(config, tgt_spk_size)
+        self.output_model=MERGE_MODEL_1(config, tgt_spk_size)
+        self.use_cuda = use_cuda
+        self.tgt_spk_size = tgt_spk_size
+        self.config = config
+        self.loss_for_ss= nn.MSELoss()
+        self.log_softmax = nn.LogSoftmax()
+
+        self.linear=nn.Linear(1024,tgt_spk_size)
+
+    def forward(self,input_image,input_speech,):
+        # Image:[t,3,416,416],Speech:[4t,257,2]
+
+        image_hidden=self.images_model(input_image)
+        speech_hidden=self.speech_model(input_speech)
+        feats_final,masks=self.output_model(image_hidden,speech_hidden)
+        predict_scores=self.linear(feats_final)
+
+        return predict_scores,masks

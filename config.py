@@ -110,16 +110,34 @@ spks_list=['FEE005', 'FEE013', 'FEE016', 'FEE019', 'FEE021', 'FEE024', 'FEE028',
 
 optim = 'adam'
 # optim = 'adagrad'
+# learning_rate = 0.002
 learning_rate = 0.0002
-learning_rate = 0.00005
+# learning_rate = 0.00005
+learning_rate = 0.00001
 max_grad_norm = 10
 learning_rate_decay = 0.5
-save_inter=10000
-mask = 1
+save_inter=5000
+
 schedule = 1
 bidirec = 1
 start_decay_at = 5
 log ='log/'
+
+mask_softmax = 0
+
+image_time_conv = 1
+images_recu=0
+
+mask_conv_bias=1
+mask_over_init=1
+only_1_meet=1
+class_frame=1 #是否每个frame最后的时候单独预测
+mask_norm=1
+# threshold=0.3
+threshold=0
+mask_topk=5
+size_sum=1
+
 
 SEED = 1234
 Min_Len = 0.5

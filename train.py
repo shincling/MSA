@@ -1,4 +1,5 @@
 import os
+import io
 import argparse
 import time
 import random
@@ -46,7 +47,10 @@ parser.add_argument('-gpus', default=[2], nargs='+', type=int,
 # parser.add_argument('-restore', default='tinyv4_15000.pt', type=str,
 # parser.add_argument('-restore', default='tinyv5_65000.pt', type=str,
 # parser.add_argument('-restore', default='tinyv8_10000.pt', type=str,
-parser.add_argument('-restore', default='tinyv9_410000.pt', type=str,
+# parser.add_argument('-restore', default='tinyv10_65000.pt', type=str, # good ~!
+# parser.add_argument('-restore', default='tinyv11_100000.pt', type=str,
+# parser.add_argument('-restore', default='116_v1_150000.pt', type=str,
+parser.add_argument('-restore', default='116_v2_250000.pt', type=str,
 # parser.add_argument('-restore', default=None, type=str,
                    help="restore checkpoint")
 parser.add_argument('-seed', type=int, default=1234,
@@ -67,10 +71,14 @@ torch.manual_seed(opt.seed)
 # checkpoint
 if opt.restore:
     print('loading checkpoint...\n',opt.restore)
-    # checkpoints = torch.load(opt.restore,map_location={'cuda:0':'cuda:2'})
+    checkpoints = torch.load(opt.restore,map_location={'cuda:0':'cuda:2'})
     # checkpoints = torch.load(opt.restore,map_location={'cuda:3':'cuda:1'})
-    checkpoints = torch.load(opt.restore,map_location='cpu')
+    # checkpoints = torch.load(opt.restore,map_location='cpu')
+
     # checkpoints = torch.load(opt.restore)
+    # with open(opt.restore) as f:
+    #     buffer = io.BytesIO(f.read())
+    # torch.load(buffer)
 
 all_spk_num=config.size_of_all_spks
 # cuda
@@ -148,6 +156,7 @@ lera.log_hyperparams({
     'mask_over_init': config.mask_over_init,
     'only 1 meet:':config.only_1_meet,
     'class_frame:':config.class_frame,
+    'mask norm:':config.mask_norm,
     'mask threshold:':config.threshold,
     'masktopk:':config.mask_topk,
     'size sum:':config.size_sum,
@@ -247,6 +256,7 @@ def train(epoch,data):
             total_loss_batch+=loss.item()
 
             print('loss this seq: ',loss.item())
+            '''
             if loss.item()<0.2 and 'Overview' in images_path and 1.4<duration<3:
             # if loss.item()<1.5 and 'Corner' not in images_path:
                 print('Low loss in: ',part)
@@ -265,6 +275,7 @@ def train(epoch,data):
                 loss_grad_list.backward()
                 optim.step()
                 loss_grad_list=None # set to 0 every N samples.
+            '''
 
             updates += 1
 
@@ -274,8 +285,8 @@ def train(epoch,data):
             continue
 
         # count every XXX updates
-        count_interval=200
-        if updates%count_interval==0: # count the performance every XXX updates
+        count_interval=1
+        if loss.item()<0.2 and updates%count_interval==0: # count the performance every XXX updates
             acc_this_interval=right_idx_everyXupdates/float(count_interval)
             logging("time: %6.3f, epoch: %3d, updates: %8d, train loss this batch: %6.3f,acc this batch: %6.3f\n"
                     % (time.time()-start_time, epoch, updates, total_loss_batch/float(count_interval),right_idx_everyXupdates/float(count_interval)))
@@ -294,6 +305,8 @@ def train(epoch,data):
             img_obj=Image.open(config.aim_path+images_path[:-4]+'/'+images_path.split('/')[-1][:-4]+'_{}.jpeg'.format("%06d"%max_frame_idx))
             lera.log_image('image_',img_obj)
             del img_obj
+            input('press to go ahead......')
+            # time.sleep(10)
 
         lera.log(
             'loss',loss.item(),
@@ -316,7 +329,7 @@ def main():
             if not train_data:
                 train_data=prepare_data('once','train')
                 if config.only_1_meet:
-                    train_data=[i for i in train_data if 'TS3005c' in i['speech_path']]
+                    train_data=[i for i in train_data if 'TS3' in i['speech_path']]
                 print('Train data gets items of: ',len(train_data))
             train(i,train_data)
         else:

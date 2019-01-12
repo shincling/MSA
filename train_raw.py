@@ -46,8 +46,8 @@ parser.add_argument('-gpus', default=[2], nargs='+', type=int,
 # parser.add_argument('-restore', default='tinyv4_15000.pt', type=str,
 # parser.add_argument('-restore', default='tinyv5_65000.pt', type=str,
 # parser.add_argument('-restore', default='tinyv8_10000.pt', type=str,
-parser.add_argument('-restore', default='tinyv9_410000.pt', type=str,
-# parser.add_argument('-restore', default=None, type=str,
+# parser.add_argument('-restore', default='tinyv9_410000.pt', type=str,
+parser.add_argument('-restore', default=None, type=str,
                    help="restore checkpoint")
 parser.add_argument('-seed', type=int, default=1234,
                     help="Random seed")
@@ -81,7 +81,7 @@ if use_cuda:
     torch.cuda.manual_seed(opt.seed)
 
 print('building model...\n')
-model = model.basic_model(config, use_cuda, all_spk_num)
+model = model.raw_model(config, use_cuda, all_spk_num)
 
 loss_func=nn.CrossEntropyLoss()
 if opt.restore:
@@ -139,7 +139,7 @@ total_loss_batch, start_time = 0, time.time()
 right_idx_everyXupdates = 0
 
 lera.log_hyperparams({
-    'title':'MSC v0.1c relu after mask, then tanh',
+    'title':'MSC raw input',
     'updates':updates,
     'log path': log_path,
     'mask_softmax:': config.mask_softmax,
@@ -196,12 +196,16 @@ def train(epoch,data):
             shift_time=np.random.random()*(duration-config.Max_Len) #可供移动的时间长度
             shift_frames_image=int(shift_time*25)
             shift_frames_speech=4*shift_frames_image
-            images_feats=images_feats[shift_frames_image:int(shift_frames_image+config.Max_Len*25)]
+            images_feats=utils.load_images(config.aim_path+images_path.replace('.npy','/')).get(shift_frames_image,int(shift_frames_image+config.Max_Len*25))
+            # t,3,416,416
+            # images_feats=images_feats[shift_frames_image:int(shift_frames_image+config.Max_Len*25)]
             speech_feats=speech_feats[shift_frames_speech:int(shift_frames_speech+config.Max_Len*100)]
             assert images_feats.shape[0]*4==speech_feats.shape[0]
         else:
             speech_feats=np.load(config.aim_path+speech_path)
-            images_feats=np.load(config.aim_path+images_path)
+            images_feats=utils.load_images(config.aim_path+images_path.replace('.npy','/')).get()
+            # t,3,416,416
+            # images_feats=np.load(config.aim_path+images_path)
             assert images_feats.shape[0]*4==speech_feats.shape[0]
         print('Enter into the model:',images_feats.shape,speech_feats.shape)
         images_feats=Variable(torch.tensor(images_feats))
@@ -213,16 +217,18 @@ def train(epoch,data):
                 speech_feats=speech_feats.cuda()
             model.zero_grad()
             predict_score,mask=model(images_feats,speech_feats)
+
+            target_spk=torch.tensor(config.spks_list.index(spk_name))
+            if config.class_frame:
+                target_spk=target_spk.expand(images_feats.shape[0])
+            del images_feats
+            del speech_feats
             if not config.class_frame:
                 predict_label=torch.argmax(predict_score,1).squeeze().item()
             else:
                 #这是在一共t个帧里
                 predict_idx=torch.argmax(predict_score).item()
                 predict_label=predict_idx%len(config.spks_list)
-
-            target_spk=torch.tensor(config.spks_list.index(spk_name))
-            if config.class_frame:
-                target_spk=target_spk.expand(images_feats.shape[0])
 
             if predict_label==config.spks_list.index(spk_name):
                 right_idx_per_epoch+=1
@@ -261,14 +267,15 @@ def train(epoch,data):
                 #     'Low loss length', duration
                 # )
 
-            if 0 and idx%8==0:
+            if 1 and idx%1==0:
                 loss_grad_list.backward()
                 optim.step()
                 loss_grad_list=None # set to 0 every N samples.
+                del loss
 
             updates += 1
 
-        except  RuntimeError as RR:
+        except  TabError as RR:
             print('EEE errors here: ',RR)
             loss_grad_list=None # set to 0 every N samples.
             continue
