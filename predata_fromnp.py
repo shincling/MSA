@@ -98,12 +98,19 @@ def prepare_data(mode,train_or_test):
     data_path=config.aim_path
     meeting_ids=os.listdir(data_path)
 
+    '''两种划分：
+    1. train/valid/test 按照pyannote库里的标准划分的，多个会议没有Overlap
+    2. all_train/all_valid，按照全部会议中的某个部分划分，序号为10的倍数的是valid，其余的是train,会议之间全部overlap 
+    '''
+
     if train_or_test=='train':
         aim_meeting_ids=config.TRAIN_LIST
     elif train_or_test=='valid':
         aim_meeting_ids=config.VALID_LIST
     elif train_or_test=='test':
         aim_meeting_ids=config.TEST_LIST
+    elif 'all' in train_or_test:
+        aim_meeting_ids=config.TRAIN_LIST+config.VALID_LIST+config.TEST_LIST
 
     for aim_meeting in aim_meeting_ids:
         assert aim_meeting in meeting_ids
@@ -130,13 +137,30 @@ def prepare_data(mode,train_or_test):
                 else:
                     continue
                 iidx,spk_name,start_time,end_time=id.split('_')
-                # spk_all.append(spk_name)
-                all_list.append({
-                    'speech_path':'/'.join([aim_meeting,view,id])+'_Audio.npy',
-                    'images_path':'/'.join([aim_meeting,view,id])+'.npy',
-                    'duration':float(end_time)-float(start_time),
-                    'spk_name':spk_name
-                })
+                if train_or_test=='all_train':
+                    if int(iidx)%10!=0:
+                        all_list.append({
+                            'speech_path':'/'.join([aim_meeting,view,id])+'_Audio.npy',
+                            'images_path':'/'.join([aim_meeting,view,id])+'.npy',
+                            'duration':float(end_time)-float(start_time),
+                            'spk_name':spk_name
+                        })
+                elif train_or_test=='all_valid': #取其中10%作为valid
+                    if int(iidx)%10==0:
+                        all_list.append({
+                            'speech_path':'/'.join([aim_meeting,view,id])+'_Audio.npy',
+                            'images_path':'/'.join([aim_meeting,view,id])+'.npy',
+                            'duration':float(end_time)-float(start_time),
+                            'spk_name':spk_name
+                        })
+                else: #正常情况啥也没有话
+                    # spk_all.append(spk_name)
+                    all_list.append({
+                        'speech_path':'/'.join([aim_meeting,view,id])+'_Audio.npy',
+                        'images_path':'/'.join([aim_meeting,view,id])+'.npy',
+                        'duration':float(end_time)-float(start_time),
+                        'spk_name':spk_name
+                    })
     return all_list
 
 
@@ -152,3 +176,14 @@ def prepare_data(mode,train_or_test):
 # print(sorted(set(spk_all)))
 # print(len(set(spk_all)))
 # time.sleep(10)
+
+# cc=prepare_data('once','train')
+# print(len(cc))
+# cc=prepare_data('once','valid')
+# print(len(cc))
+# cc=prepare_data('once','test')
+# print(len(cc))
+# cc=prepare_data('once','all_train')
+# print(len(cc))
+# cc=prepare_data('once','all_valid')
+# print(len(cc))
