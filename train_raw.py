@@ -151,6 +151,7 @@ lera.log_hyperparams({
     'mask threshold:':config.threshold,
     'masktopk:':config.mask_topk,
     'size sum:':config.size_sum,
+    'hidden_embs:':config.hidden_embs,
 })
 def save_model(path):
     global updates
@@ -244,7 +245,7 @@ def train(epoch,data):
             else:
                 # print(next(model.parameters()).grad)
 
-                # loss_grad_list=loss_grad_list+loss
+                loss_grad_list=loss_grad_list+loss
                 pass
 
                 # loss_grad_list.backward()
@@ -261,22 +262,34 @@ def train(epoch,data):
                 # 1/0
                 # input('Print to the next...')
             else:
-                continue
+                # continue
+                pass
 
                 # lera.log(
                 #     'Low loss length', duration
                 # )
+            lera.log(
+                'loss',loss.item(),
+            )
 
             if 1 and idx%1==0:
                 loss_grad_list.backward()
                 optim.step()
-                loss_grad_list=None # set to 0 every N samples.
                 del loss
+                del loss_grad_list
+                del predict_score
+                # del mask
+                loss_grad_list=None # set to 0 every N samples.
+                print('Updates here.\n')
 
             updates += 1
 
-        except  TabError as RR:
+        except RuntimeError as RR:
             print('EEE errors here: ',RR)
+            # del loss
+            # del loss_grad_list
+            # del predict_score
+            # del mask
             loss_grad_list=None # set to 0 every N samples.
             continue
 
@@ -302,9 +315,9 @@ def train(epoch,data):
             lera.log_image('image_',img_obj)
             del img_obj
 
-        lera.log(
-            'loss',loss.item(),
-        )
+        # lera.log(
+        #     'loss',loss.item(),
+        # )
         if updates%config.save_inter==0:
             save_model(save_pat)
     print('Loss aver for this epoch:',loss_total/len(data))
