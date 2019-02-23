@@ -6,8 +6,9 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
 def draw_map(data_path,mask_seq):
-    shutil.rmtree('visions/')
-    os.mkdir('visions/')
+    data_path='visions/'
+    shutil.rmtree(data_path)
+    os.mkdir(data_path)
     mask_seq=mask_seq[:,:,:,0]
     frames=mask_seq.shape[0]
     for iii in range(frames):
@@ -22,4 +23,4 @@ def draw_map(data_path,mask_seq):
         ax1.set_xticklabels([])  # 设置x轴图例为空值
         ax1.set_ylabel('kind')
 
-        f.savefig('visions/sns_heatmap_normal_{}.jpg'.format(iii+1), bbox_inches='tight')
+        f.savefig(data_path+'sns_heatmap_normal_{}.jpg'.format(iii+1), bbox_inches='tight')
