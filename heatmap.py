@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
 def draw_map(data_path,mask_seq):
-    data_path='visions/'
+    # data_path='visions/'
     shutil.rmtree(data_path)
     os.mkdir(data_path)
     mask_seq=mask_seq[:,:,:,0]
