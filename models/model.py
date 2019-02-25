@@ -216,7 +216,7 @@ class SPEECH_MODEL_1(nn.Module):
                 x=pool_layer(x)
             # print('speech shape after CNNs:',idx,'', x.size())
 
-        # print('speech shape final:', x.size(),'\n')
+        # print('speech shape final:', x.size(),'\n') # (t,8,1024)
         return x
 
 class SPEECH_MODEL_2(nn.Module):
