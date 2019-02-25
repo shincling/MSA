@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser(description='train.py')
 
 parser.add_argument('-config', default='config.py', type=str,
                     help="config file")
-parser.add_argument('-gpus', default=[2], nargs='+', type=int,
+parser.add_argument('-gpus', default=[3], nargs='+', type=int,
                     help="Use CUDA on the listed devices.")
 # parser.add_argument('-restore', default='8ups_lowlr_50000.pt', type=str,
 # parser.add_argument('-restore', default='70000_chechpoint.pt', type=str,
@@ -50,8 +50,8 @@ parser.add_argument('-gpus', default=[2], nargs='+', type=int,
 # parser.add_argument('-restore', default='tinyv10_65000.pt', type=str, # good ~!
 # parser.add_argument('-restore', default='tinyv11_100000.pt', type=str,
 # parser.add_argument('-restore', default='116_v1_150000.pt', type=str,
-parser.add_argument('-restore', default='116_v2_250000.pt', type=str,
-# parser.add_argument('-restore', default=None, type=str,
+# parser.add_argument('-restore', default='116_v2_250000.pt', type=str,
+parser.add_argument('-restore', default=None, type=str,
                    help="restore checkpoint")
 parser.add_argument('-seed', type=int, default=1234,
                     help="Random seed")
@@ -59,7 +59,7 @@ parser.add_argument('-model', default='model', type=str,
                     help="Model selection")
 parser.add_argument('-score', default='', type=str,
                     help="score_fn")
-parser.add_argument('-notrain', default=False, type=bool,
+parser.add_argument('-notrain', default=0, type=bool,
                     help="train or not")
 parser.add_argument('-log', default='', type=str,
                     help="log directory")
@@ -80,7 +80,12 @@ if opt.restore:
     #     buffer = io.BytesIO(f.read())
     # torch.load(buffer)
 
-all_spk_num=config.size_of_all_spks
+# all_spk_num=config.size_of_all_spks
+# all_spk_num=len(config.spks_list_TS3)
+# config.spks_list=config.spks_list_TS3
+all_spk_num=len(config.spks_list_NoE)
+config.spks_list=config.spks_list_NoE
+
 # cuda
 use_cuda = torch.cuda.is_available() and len(opt.gpus) > 0
 use_cuda = True
@@ -177,7 +182,9 @@ def save_model(path):
 
 
 def train(epoch,data):
-    global save_pat,updates,total_loss_batch,right_idx_everyXupdates
+    global updates,total_loss_batch,right_idx_everyXupdates
+    total_loss_batch=0
+    right_idx_everyXupdates=0
     print('*'*25,'Train epoch:',epoch,'*'*25)
     random.shuffle(data)
     print('First of data:',data[0])
@@ -188,13 +195,153 @@ def train(epoch,data):
         lera.log(
             'lr', scheduler.get_lr()[0]
         )
-
     loss_total=0.0
     right_idx_per_epoch=0
     loss_grad_list=None
     for idx,part in enumerate(data):
         speech_path,images_path,duration,spk_name=part['speech_path'],\
                                                   part['images_path'],\
+                                                  part['duration'],part['spk_name']
+        if duration<config.Min_Len:
+            continue
+        elif duration>config.Max_Len:
+            speech_feats=np.load(config.aim_path+speech_path)
+            images_feats=np.load(config.aim_path+images_path)
+            assert images_feats.shape[0]*4==speech_feats.shape[0]
+            shift_time=np.random.random()*(duration-config.Max_Len) #可供移动的时间长度
+            shift_frames_image=int(shift_time*25)
+            shift_frames_speech=4*shift_frames_image
+            images_feats=images_feats[shift_frames_image:int(shift_frames_image+config.Max_Len*25)]
+            speech_feats=speech_feats[shift_frames_speech:int(shift_frames_speech+config.Max_Len*100)]
+            assert images_feats.shape[0]*4==speech_feats.shape[0]
+        else:
+            speech_feats = np.load(config.aim_path + speech_path)
+            images_feats = np.load(config.aim_path + images_path)
+            assert images_feats.shape[0] * 4 == speech_feats.shape[0]
+        print('Enter into the model:', images_feats.shape, speech_feats.shape)
+        images_feats = Variable(torch.tensor(images_feats))
+        speech_feats = Variable(torch.tensor(speech_feats))
+
+        try:
+            if use_cuda:
+                images_feats = images_feats.cuda()
+                speech_feats = speech_feats.cuda()
+            model.zero_grad()
+            predict_score, mask = model(images_feats, speech_feats)
+            if not config.class_frame:
+                predict_label = torch.argmax(predict_score, 1).squeeze().item()
+            else:
+                # 这是在一共t个帧里
+                predict_idx = torch.argmax(predict_score).item()
+                predict_label = predict_idx % len(config.spks_list)
+
+            target_spk = torch.tensor(config.spks_list.index(spk_name))
+            if config.class_frame:
+                target_spk = target_spk.expand(images_feats.shape[0])
+
+            if predict_label == config.spks_list.index(spk_name):
+                right_idx_per_epoch += 1
+                right_idx_everyXupdates += 1
+            if use_cuda:
+                target_spk = target_spk.cuda()
+                if not config.class_frame:
+                    target_spk = target_spk.unsqueeze(0)
+
+            loss = loss_func(predict_score, target_spk)
+            if loss_grad_list is None:
+                loss_grad_list = loss
+            else:
+                # print(next(model.parameters()).grad)
+
+                loss_grad_list = loss_grad_list + loss
+                pass
+
+                # loss_grad_list.backward()
+                # print(next(model.parameters()).grad[0])
+            loss_total+=loss.item()
+            total_loss_batch+=loss.item()
+
+            print('loss this seq: ',loss.item())
+            # if loss.item()<1.1 and 'Overview' in images_path :
+            # if loss.item()<1.5 and 'Corner' not in images_path:
+            #     print('Low loss in: ',part)
+            #     draw_map(images_path,mask.data.cpu().numpy())
+            #     1/0
+
+            # else:
+            #     continue
+
+                # lera.log(
+                #     'Low loss length', duration
+                # )
+
+            if 1 and idx%8==0:
+                loss_grad_list.backward()
+                optim.step()
+                loss_grad_list=None # set to 0 every N samples.
+
+            updates += 1
+
+
+            # count every XXX updates
+            count_interval=200
+            if updates%count_interval==0: # count the performance every XXX updates
+                acc_this_interval=right_idx_everyXupdates/float(count_interval)
+                logging("time: %6.3f, epoch: %3d, updates: %8d, train loss this batch: %6.3f,acc this batch: %6.3f\n"
+                    % (time.time()-start_time, epoch, updates, total_loss_batch/float(count_interval),right_idx_everyXupdates/float(count_interval)))
+                total_loss_batch=0
+                right_idx_everyXupdates=0
+                lera.log(
+                    'Acc',acc_this_interval
+                )
+                draw_map(images_path,mask.data.cpu().numpy())
+                if config.class_frame:
+                    max_frame_idx=int(predict_idx/len(config.spks_list))+1
+                else:
+                    max_frame_idx=7
+                img_obj=Image.open('visions/sns_heatmap_normal_{}.jpg'.format(max_frame_idx))
+                rand_idx=str(random.randint(1,5))
+                lera.log_image('mask_'+rand_idx,img_obj)
+                img_obj=Image.open(config.aim_path+images_path[:-4]+'/'+images_path.split('/')[-1][:-4]+'_{}.jpeg'.format("%06d"%max_frame_idx))
+                lera.log_image('image_'+rand_idx,img_obj)
+                del img_obj
+
+            lera.log(
+                'loss',loss.item(),
+            )
+
+            if updates%config.save_inter==0:
+                save_model(save_pat)
+
+        except  RuntimeError as RR:
+            print('EEE errors here: ',RR)
+            loss_grad_list=None # set to 0 every N samples.
+            continue
+    print('Loss aver for this epoch:',loss_total/len(data))
+    print('Acc aver for this epoch:',right_idx_per_epoch/float(len(data)))
+    if epoch>=20:
+        eval_data=prepare_data('once','all_valid')
+        if config.only_1_meet:
+            eval_data=[i for i in eval_data if 'TS3' in i['speech_path']]
+        print('EVAL data gets items of: ',len(eval_data))
+        assert len(set([one['spk_name'] for  one in eval_data]))==all_spk_num
+        eval(epoch,eval_data)
+
+def eval(epoch,data):
+    global save_pat,updates,total_loss_batch,right_idx_everyXupdates
+    total_loss_batch=0
+    right_idx_everyXupdates=0
+    print('*'*25,'Eval epoch:',epoch,'*'*25)
+    print('Valid begins in epoch',epoch)
+    # random.shuffle(data)
+    print('First of data:',data[0])
+    loss_total=0.0
+    right_idx_per_epoch=0
+    loss_grad_list=None
+    success_counte=0.0
+    for idx,part in enumerate(data):
+        speech_path,images_path,duration,spk_name=part['speech_path'], \
+                                                  part['images_path'], \
                                                   part['duration'],part['spk_name']
         if duration<config.Min_Len:
             continue
@@ -242,16 +389,7 @@ def train(epoch,data):
                     target_spk=target_spk.unsqueeze(0)
 
             loss=loss_func(predict_score,target_spk)
-            if loss_grad_list is None:
-                loss_grad_list=loss
-            else:
-                # print(next(model.parameters()).grad)
 
-                # loss_grad_list=loss_grad_list+loss
-                pass
-
-                # loss_grad_list.backward()
-                # print(next(model.parameters()).grad[0])
             loss_total+=loss.item()
             total_loss_batch+=loss.item()
 
@@ -278,64 +416,72 @@ def train(epoch,data):
             '''
 
             updates += 1
+            success_counte+=1
 
         except  RuntimeError as RR:
             print('EEE errors here: ',RR)
-            loss_grad_list=None # set to 0 every N samples.
             continue
 
         # count every XXX updates
-        count_interval=1
-        if loss.item()<0.2 and updates%count_interval==0: # count the performance every XXX updates
+        count_interval=200
+        if updates%count_interval==0: # count the performance every XXX updates
             acc_this_interval=right_idx_everyXupdates/float(count_interval)
-            logging("time: %6.3f, epoch: %3d, updates: %8d, train loss this batch: %6.3f,acc this batch: %6.3f\n"
+            logging("time: %6.3f, epoch: %3d, updates: %8d, valid loss this batch: %6.3f,valid acc this batch: %6.3f\n"
                     % (time.time()-start_time, epoch, updates, total_loss_batch/float(count_interval),right_idx_everyXupdates/float(count_interval)))
             total_loss_batch=0
             right_idx_everyXupdates=0
             lera.log(
-                'Acc',acc_this_interval
+                'Acc_valid',acc_this_interval
             )
-            draw_map(images_path,mask.data.cpu().numpy())
-            if config.class_frame:
-                max_frame_idx=int(predict_idx/len(config.spks_list))+1
-            else:
-                max_frame_idx=7
-            img_obj=Image.open('visions/sns_heatmap_normal_{}.jpg'.format(max_frame_idx))
-            lera.log_image('mask_',img_obj)
-            img_obj=Image.open(config.aim_path+images_path[:-4]+'/'+images_path.split('/')[-1][:-4]+'_{}.jpeg'.format("%06d"%max_frame_idx))
-            lera.log_image('image_',img_obj)
-            del img_obj
-            input('press to go ahead......')
-            # time.sleep(10)
+
+            if 0 and loss.item()<0.2:
+                draw_map(images_path,mask.data.cpu().numpy())
+                if config.class_frame:
+                    max_frame_idx=int(predict_idx/len(config.spks_list))+1
+                else:
+                    max_frame_idx=7
+                img_obj=Image.open('visions/sns_heatmap_normal_{}.jpg'.format(max_frame_idx))
+                lera.log_image('mask_valid',img_obj)
+                img_obj=Image.open(config.aim_path+images_path[:-4]+'/'+images_path.split('/')[-1][:-4]+'_{}.jpeg'.format("%06d"%max_frame_idx))
+                lera.log_image('image_valid',img_obj)
+                del img_obj
+                input('press to go ahead......')
 
         lera.log(
-            'loss',loss.item(),
+            'loss_valid',loss.item(),
         )
-        if updates%config.save_inter==0:
-            save_model(save_pat)
-    print('Loss aver for this epoch:',loss_total/len(data))
-    print('Acc aver for this epoch:',right_idx_per_epoch/float(len(data)))
 
-def eval(epoch,data):
-    print('*'*25,'Eval epoch:',epoch,'*'*25)
-    random.shuffle(data)
-    print('First of data:',data[0])
-    return
+    print('Loss valid aver for this epoch:',loss_total/len(data))
+    print('Acc valid aver for this epoch:',right_idx_per_epoch/float(len(data)))
+    lera.log(
+        'Acc_valid_all',right_idx_per_epoch/float(success_counte))
+    lera.log(
+        'Loss_valid_all',loss_total/len(success_counte))
+    print('Valid ends in epoch',epoch)
 
 def main():
     train_data,eval_data=None,None
     for i in range(1, config.EPOCH_SIZE+1):
         if not opt.notrain:
             if not train_data:
-                train_data=prepare_data('once','train')
+                train_data=prepare_data('once','all_train')
                 if config.only_1_meet:
-                    train_data=[i for i in train_data if 'TS3' in i['speech_path']]
+                    # train_data=[i for i in train_data if 'TS3' in i['speech_path']]
+                    train_data=[i for i in train_data if i['speech_path'][0]!='E']
                 print('Train data gets items of: ',len(train_data))
+                # all_spk_list=set([one['spk_name'] for  one in train_data])
+                # print(len(all_spk_list))
+                # print(all_spk_list)
+                # assert len(all_spk_list)==all_spk_num
+                assert len(set([one['spk_name'] for  one in train_data]))==all_spk_num
             train(i,train_data)
         else:
             if not eval_data:
-                eval_data=prepare_data('once','valid')
+                eval_data=prepare_data('once','all_valid')
+                if config.only_1_meet:
+                    eval_data=[i for i in eval_data if 'TS3' in i['speech_path']]
                 print('EVAL data gets items of: ',len(eval_data))
+                assert len(set([one['spk_name'] for  one in eval_data]))==all_spk_num
             eval(i,eval_data)
     for metric in config.metric:
         logging("Best %s score: %.2f\n" % (metric, max(scores[metric])))
