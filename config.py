@@ -105,18 +105,39 @@ spks_list=['FEE005', 'FEE013', 'FEE016', 'FEE019', 'FEE021', 'FEE024', 'FEE028',
            'MTD021PM', 'MTD022ID', 'MTD023UID', 'MTD024ME', 'MTD025PM', 'MTD026UID', 'MTD027ID',
            'MTD028ME', 'MTD029PM', 'MTD030ID', 'MTD031UID', 'MTD032ME', 'MTD033PM', 'MTD034ID',
            'MTD035UID', 'MTD036ME', 'MTD037PM', 'MTD038ID', 'MTD039UID', 'MTD040ME', 'MTD041PM',
-           'MTD042ID', 'MTD043UID', 'MTD044ME', 'MTD045PM', 'MTD046ID', 'MTD047UID', 'MTD048ME']
+           'MTD042ID', 'MTD043UID', 'MTD044ME', 'MTD045PM', 'MTD046ID', 'MTD047UID', 'MTD048ME'] #总共179
+spks_list_TS3=[
+'MTD022ID', 'MTD025PM', 'MTD041PM', 'MTD020ME', 'MTD030ID', 'MTD029PM', 'MTD039UID', 'MTD014ID',
+    'MTD015UID', 'MTD011UID', 'MTD0010ID', 'MTD036ME', 'MTD045PM', 'MTD047UID', 'MTD031UID',
+    'MTD023UID', 'MTD040ME', 'FTD019UID', 'MTD018ID', 'MTD035UID', 'MTD024ME', 'MTD043UID',
+    'MTD044ME', 'MTD021PM', 'MTD027ID', 'MTD038ID', 'MTD028ME', 'MTD037PM', 'MTD012ME',
+    'MTD009PM', 'MTD016ME', 'MTD042ID', 'MTD013PM', 'MTD048ME', 'MTD034ID', 'MTD033PM',
+    'MTD017PM', 'MTD046ID', 'MTD032ME', 'MTD026UID'
+] #总共40
+spks_list_NoE=[
+ 'MIO076', 'MTD040ME', 'MIO035', 'MIO066', 'MTD038ID', 'MTD017PM', 'MIE085', 'MIO018',
+ 'MTD032ME', 'MTD024ME', 'MIO025', 'MTD021PM', 'MIO016', 'MIO105', 'MIE083', 'MIO072',
+ 'MIO050', 'FIO017', 'MIO055', 'MIO100', 'FIE038', 'MTD026UID', 'MTD047UID', 'MIO092',
+ 'MTD015UID', 'MIO026', 'MTD034ID', 'MTD041PM', 'MIO008', 'MTD027ID', 'MIE080', 'MTD036ME',
+ 'MIO098', 'MTD023UID', 'MIE029', 'MTD045PM', 'MTD030ID', 'MTD039UID', 'MIO091', 'MTD043UID',
+ 'MTD031UID', 'MTD013PM', 'MIE034', 'FIE073', 'FIE088', 'MTD009PM', 'MTD014ID', 'FIO093',
+ 'FTD019UID', 'MTD037PM', 'FIE081', 'MTD029PM', 'MIO075', 'MTD011UID', 'FIO089', 'MIO097',
+ 'MTD018ID', 'MTD020ME', 'MIO104', 'MIO086', 'MTD035UID', 'FIO041', 'MTD048ME', 'MTD046ID',
+ 'MTD0010ID', 'MIO024', 'MIO012', 'MTD044ME', 'MIO099', 'FIO074', 'MIO023', 'MIO106', 'MIO077',
+ 'MTD042ID', 'MTD025PM', 'MIE090', 'MIO022', 'MTD012ME', 'MIO019', 'MIO101', 'MIO043', 'MIO082',
+ 'MIO040', 'FIO084', 'MIO078', 'MTD028ME', 'MIO020', 'MTD016ME', 'MTD033PM', 'MIO047', 'MIO049',
+ 'FIO087', 'MIO005', 'MTD022ID', 'MIE002', 'MIO031'] #总共96
 
 
 optim = 'adam'
 # optim = 'adagrad'
-# learning_rate = 0.002
-learning_rate = 0.0002
+learning_rate = 0.001
+# learning_rate = 0.0002
 # learning_rate = 0.00005
-learning_rate = 0.00001
+# learning_rate = 0.00001
 max_grad_norm = 10
 learning_rate_decay = 0.5
-save_inter=5000
+save_inter=3000
 
 schedule = 1
 bidirec = 1
@@ -126,6 +147,7 @@ log ='log/'
 mask_softmax = 0
 
 image_time_conv = 1
+image_time_rnn = 0
 images_recu=0
 
 mask_conv_bias=1
@@ -133,10 +155,11 @@ mask_over_init=1
 only_1_meet=1
 class_frame=1 #是否每个frame最后的时候单独预测
 mask_norm=1
-# threshold=0.3
-threshold=0
-mask_topk=5
+threshold=0.08
+# threshold=0
+mask_topk=0
 size_sum=1
+hidden_embs=1024
 
 
 SEED = 1234
