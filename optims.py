@@ -1,6 +1,7 @@
 import math
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
+import adabound
 
 class Optim(object):
 
@@ -14,6 +15,8 @@ class Optim(object):
             self.optimizer = optim.Adadelta(self.params, lr=self.lr)
         elif self.method == 'adam':
             self.optimizer = optim.Adam(self.params, lr=self.lr)
+        elif self.method == 'adaBound':
+            self.optimizer = adabound.AdaBound(self.params, lr=self.lr,final_lr=0.1)
         else:
             raise RuntimeError("Invalid optim method: " + self.method)
 
