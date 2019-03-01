@@ -448,6 +448,77 @@ class MERGE_MODEL_v0(nn.Module):
         # print('Gets final feats: ',feats_final.shape)
 
         return feats_final,mask
+
+class image_only(nn.Module):
+    def __init__(self, config,tgt_spk_size):
+        super(image_only, self).__init__()
+        self.tgt_spk_size = tgt_spk_size
+        self.config = config
+
+        self.sp_pool=nn.MaxPool2d((1,8))
+        self.sp_fc1=nn.Linear(1024,1024)
+        self.sp_fc2=nn.Linear(1024,1024)
+
+        self.im_conv1=nn.Conv2d(1024,1024,(1,1),stride=1,padding=(0,0),dilation=(1,1))
+        self.im_conv2=nn.Conv2d(1024,1024,(1,1),stride=1,padding=(0,0),dilation=(1,1))
+
+        self.mask_conv=nn.Conv2d(1,1,(1,1),stride=1,padding=(0,0),dilation=(1,1),bias=False)
+        # self.pool_over_size=nn.AvgPool2d((config.image_size[0],config.image_size[1]))
+        self.pool_over_size=nn.MaxPool2d((config.image_size[0],config.image_size[1]))
+
+        if config.image_time_conv:
+            self.image_time_conv=nn.Conv1d(1024,1024,5,stride=1,padding=2,dilation=1,groups=1024)
+
+        if config.image_time_rnn:
+            self.image_time_rnn=nn.LSTM(1024,512,2,batch_first=True,bidirectional=True)
+        # self.pool_over_size=nn.AvgPool2d((config.image_size[0],config.image_size[1]))
+        self.pool_over_size=nn.MaxPool2d((config.image_size[0],config.image_size[1]))
+
+    def forward(self, image_hidden):
+        config=self.config
+        if config.image_time_conv: # 是否采用时间维度的conv
+            image_hidden_tmp=image_hidden.view(-1,1024,config.image_size[0]*config.image_size[1]).transpose(0,2)  #[13*13,1024,t]
+            image_hidden_tmp=self.image_time_conv(image_hidden_tmp)#[13*13,1024,t]
+            image_hidden_tmp=image_hidden_tmp.transpose(0,2).view(-1,1024,config.image_size[0],config.image_size[1])
+            image_hidden_tmp=F.relu(self.im_conv1(image_hidden_tmp))
+
+        elif config.image_time_rnn: # 是否采用时间维度的conv
+            image_hidden_tmp=image_hidden.view(-1,1024,config.image_size[0]*config.image_size[1]).transpose(0,2).transpose(1,2)  #[13*13,t,1024]
+            image_hidden_tmp=self.image_time_rnn(image_hidden_tmp)[0]#[13*13,t,1024]
+            image_hidden_tmp=image_hidden_tmp.transpose(0,2).transpose(0,1).contiguous().view(-1,1024,config.image_size[0],config.image_size[1])
+            image_hidden_tmp=F.relu(self.im_conv1(image_hidden_tmp))
+        # elif config.images_recu:
+        #     image_hidden_tmp=torch.zeros_like(image_hidden)
+        # print('image original:')
+        # print(image_hidden[0,10])
+        # print(image_hidden[1,10])
+        # for idx,frame in enumerate(image_hidden[:-1]):
+        #     image_hidden_tmp[idx]=image_hidden[idx+1]-frame
+        # print('image after:')
+        # print(image_hidden_tmp[0,10])
+        # print(image_hidden_tmp[1,10])
+        else:
+            image_hidden_tmp=F.relu(self.im_conv1(image_hidden))
+        image_final=F.relu(self.im_conv2(image_hidden_tmp)) #[t,1024,13,13]
+        image_final = torch.transpose(torch.transpose(image_final, 1, 3), 1, 2)  # [t,13,13,1024]
+        images_masked=image_final
+
+        # print('Gets masked images: ',images_masked.shape)
+        images_masked=torch.transpose(torch.transpose(images_masked,1,3),2,3) #[t,1024, 13,13]
+        if not config.size_sum:
+            images_masked_aver=self.pool_over_size(images_masked).squeeze() #[t,1024]
+        else:
+            images_masked_aver=images_masked.view(-1,1024,config.image_size[0]*config.image_size[1]).sum(2)#[t,1024]
+        # print('Gets masked images aver: ',images_masked_aver.shape)
+
+        if not config.class_frame:
+            feats_final=torch.mean(images_masked_aver,dim=0,keepdim=True) #[1,1024]
+        else:
+            feats_final=images_masked_aver
+        # print('Gets final feats: ',feats_final.shape)
+
+        return feats_final, None
+
 class MERGE_MODEL_1(nn.Module):
     def __init__(self, config,tgt_spk_size):
         super(MERGE_MODEL_1, self).__init__()
@@ -698,13 +769,13 @@ class basic_model(nn.Module):
     def __init__(self, config, use_cuda,tgt_spk_size):
         super(basic_model, self).__init__()
 
-        # self.speech_model=SPEECH_MODEL_1(config,)
+        self.speech_model=SPEECH_MODEL_1(config,)
         # self.images_model=IMAGES_MODEL(config,)
         # self.output_model=MERGE_MODEL(config, tgt_spk_size)
         self.output_model=MERGE_MODEL_1(config, tgt_spk_size)
 
-        self.speech_model=SPEECH_MODEL_v0(config,)
-        self.output_model=MERGE_MODEL_v0(config, tgt_spk_size)
+        # self.speech_model=SPEECH_MODEL_v0(config,)
+        # self.output_model=MERGE_MODEL_v0(config, tgt_spk_size)
         self.use_cuda = use_cuda
         self.tgt_spk_size = tgt_spk_size
         self.config = config
@@ -720,6 +791,27 @@ class basic_model(nn.Module):
         feats_final,masks=self.output_model(input_image,speech_hidden)
         predict_scores=self.linear(feats_final)
 
+        return predict_scores,masks
+
+class basic_image_model(nn.Module):
+    def __init__(self, config, use_cuda,tgt_spk_size):
+        super(basic_image_model, self).__init__()
+
+        self.output_model=image_only(config, tgt_spk_size)
+
+        self.use_cuda = use_cuda
+        self.tgt_spk_size = tgt_spk_size
+        self.config = config
+        self.loss_for_ss= nn.MSELoss()
+        self.log_softmax = nn.LogSoftmax()
+
+        self.linear=nn.Linear(1024,tgt_spk_size)
+
+    def forward(self,input_image,input_speech,):
+        # Image:[t,1024,3,13],Speech:[4t,257,2]
+
+        feats_final,masks=self.output_model(input_image)
+        predict_scores=self.linear(feats_final)
         return predict_scores,masks
 
 class raw_model(nn.Module):
