@@ -519,6 +519,50 @@ class image_only(nn.Module):
 
         return feats_final, None
 
+class audio_only(nn.Module):
+    def __init__(self, config,tgt_spk_size):
+        super(audio_only, self).__init__()
+        self.tgt_spk_size = tgt_spk_size
+        self.config = config
+
+        self.sp_pool=nn.MaxPool2d((1,8))
+        self.sp_fc1=nn.Linear(1024,1024)
+        self.sp_fc2=nn.Linear(1024,1024)
+
+        self.im_conv1=nn.Conv2d(1024,1024,(1,1),stride=1,padding=(0,0),dilation=(1,1))
+        self.im_conv2=nn.Conv2d(1024,1024,(1,1),stride=1,padding=(0,0),dilation=(1,1))
+
+        self.mask_conv=nn.Conv2d(1,1,(1,1),stride=1,padding=(0,0),dilation=(1,1),bias=False)
+        # self.pool_over_size=nn.AvgPool2d((config.image_size[0],config.image_size[1]))
+        self.pool_over_size=nn.MaxPool2d((config.image_size[0],config.image_size[1]))
+
+        if config.image_time_conv:
+            self.image_time_conv=nn.Conv1d(1024,1024,5,stride=1,padding=2,dilation=1,groups=1024)
+
+        if config.image_time_rnn:
+            self.image_time_rnn=nn.LSTM(1024,512,2,batch_first=True,bidirectional=True)
+        # self.pool_over_size=nn.AvgPool2d((config.image_size[0],config.image_size[1]))
+        self.pool_over_size=nn.MaxPool2d((config.image_size[0],config.image_size[1]))
+
+    def forward(self,speech_hidden):
+        config=self.config
+        #Image:[t,1024,13,13],Speech:[1,1024,t,8]
+        speech_hidden=self.sp_pool(speech_hidden).squeeze(-1) #[1,1024,t,1]-->[1,1024,t]
+        speech_hidden=torch.transpose(speech_hidden,1,2) # [1,t,1024]
+        speech_hidden=F.relu(self.sp_fc1(speech_hidden)) # [1,t,1024]
+        speech_final=F.relu(self.sp_fc2(speech_hidden)) # [1,t,1024]
+        # print('Gets speech final: ',speech_final.shape)
+        speech_final=speech_final.squeeze() #[t,1024]
+        # print('Gets speech final: ',speech_final.shape)
+
+        if not config.class_frame:
+            feats_final=torch.mean(speech_final,dim=0,keepdim=True) #[1,1024]
+        else:
+            feats_final=speech_final
+        # print('Gets final feats: ',feats_final.shape)
+
+        return feats_final,None
+
 class MERGE_MODEL_1(nn.Module):
     def __init__(self, config,tgt_spk_size):
         super(MERGE_MODEL_1, self).__init__()
@@ -811,6 +855,28 @@ class basic_image_model(nn.Module):
         # Image:[t,1024,3,13],Speech:[4t,257,2]
 
         feats_final,masks=self.output_model(input_image)
+        predict_scores=self.linear(feats_final)
+        return predict_scores,masks
+
+class basic_audio_model(nn.Module):
+    def __init__(self, config, use_cuda,tgt_spk_size):
+        super(basic_audio_model, self).__init__()
+
+        self.speech_model=SPEECH_MODEL_1(config,)
+        self.output_model=audio_only(config, tgt_spk_size)
+
+        self.use_cuda = use_cuda
+        self.tgt_spk_size = tgt_spk_size
+        self.config = config
+        self.loss_for_ss= nn.MSELoss()
+        self.log_softmax = nn.LogSoftmax()
+
+        self.linear=nn.Linear(1024,tgt_spk_size)
+
+    def forward(self,input_image,input_speech,):
+        # Image:[t,1024,3,13],Speech:[4t,257,2]
+        speech_hidden=self.speech_model(input_speech)
+        feats_final,masks=self.output_model(speech_hidden)
         predict_scores=self.linear(feats_final)
         return predict_scores,masks
 
