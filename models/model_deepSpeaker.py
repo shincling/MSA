@@ -93,7 +93,7 @@ class myResNet(nn.Module):
 
         self.relu = ReLU(inplace=True)
         self.inplanes = 64
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=5, stride=2, padding=2, bias=False)
+        self.conv1 = nn.Conv2d(2, 64, kernel_size=5, stride=2, padding=2, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.layer1 = self._make_layer(block, 64, layers[0])
 
@@ -110,7 +110,7 @@ class myResNet(nn.Module):
         self.bn4 = nn.BatchNorm2d(512)
         self.layer4 = self._make_layer(block, 512, layers[3])
 
-        self.avgpool = nn.AdaptiveAvgPool2d((1, None))
+        self.avgpool = nn.AdaptiveAvgPool2d((1,2048))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
@@ -156,6 +156,7 @@ class DeepSpeakerModel(nn.Module):
         self.embedding_size = embedding_size
 
         self.model = myResNet(BasicBlock, [1, 1, 1, 1])
+        self.model.pre_fc = nn.Linear(257,64)
         if feature_dim == 64:
             self.model.fc = nn.Linear(512 * 4, self.embedding_size)
         elif feature_dim == 40:
@@ -177,29 +178,43 @@ class DeepSpeakerModel(nn.Module):
 
     def forward(self, x):
 
+        x=x.transpose(0,2).transpose(1,2).unsqueeze(0) # [1,2,t,257]
+        x=self.model.pre_fc(x) #[1,2,t,2048]
+        # print('size 0:',x.size())
         x = self.model.conv1(x)
+        # print('size 1:',x.size())
         x = self.model.bn1(x)
         x = self.model.relu(x)
         x = self.model.layer1(x)
+        # print('size 1:',x.size())
 
         x = self.model.conv2(x)
         x = self.model.bn2(x)
+        # print('size 2:',x.size())
         x = self.model.relu(x)
         x = self.model.layer2(x)
+        # print('size 2:',x.size())
 
         x = self.model.conv3(x)
         x = self.model.bn3(x)
         x = self.model.relu(x)
         x = self.model.layer3(x)
+        # print('size 3:',x.size())
 
         x = self.model.conv4(x)
         x = self.model.bn4(x)
         x = self.model.relu(x)
         x = self.model.layer4(x)
+        # print('size 4:',x.size()) #[1,512,t~,4]
+        x=x.transpose(1,2).contiguous().view(1,-1,2048)
+        # print('size 4:',x.size()) #[1,512,t~,4]
 
         x = self.model.avgpool(x)
+        # print('size 4:',x.size()) #[1,512,t~,4]
         x = x.view(x.size(0), -1)
+        # print('size 4:',x.size()) #[1,512,t~,4]
         x = self.model.fc(x)
+        # print('size 4:',x.size()) #[1,512,t~,4]
         self.features = self.l2_norm(x)
         # Multiply by alpha = 10 as suggested in https://arxiv.org/pdf/1703.09507.pdf
         alpha = 10
@@ -211,6 +226,30 @@ class DeepSpeakerModel(nn.Module):
         return self.features
 
     def forward_classifier(self, x):
-        features = self.forward(x)
+        # features = self.forward(x)
+        features=x
         res = self.model.classifier(features)
         return res
+
+class basic_audio_model_deepSpeaker(nn.Module):
+    def __init__(self, config, use_cuda,tgt_spk_size):
+        super(basic_audio_model_deepSpeaker, self).__init__()
+
+        self.speech_model=DeepSpeakerModel(512,tgt_spk_size)
+
+        self.use_cuda = use_cuda
+        self.tgt_spk_size = tgt_spk_size
+        self.config = config
+        self.loss_for_ss= nn.MSELoss()
+        self.log_softmax = nn.LogSoftmax()
+
+        self.linear=self.speech_model.forward_classifier
+
+    def forward(self,input_image,input_speech,):
+        # Image:[t,1024,3,13],Speech:[4t,257,2]
+        feats_final=self.speech_model(input_speech)
+        # feats_final,masks=self.output_model(speech_hidden)
+        predict_scores=self.linear(feats_final)
+        return predict_scores, None
+
+
