@@ -245,7 +245,7 @@ class basic_audio_model_deepSpeaker(nn.Module):
 
         self.linear=self.speech_model.forward_classifier
 
-    def forward(self,input_image,input_speech,):
+    def forward(self,input_speech,):
         # Image:[t,1024,3,13],Speech:[4t,257,2]
         feats_final=self.speech_model(input_speech)
         # feats_final,masks=self.output_model(speech_hidden)

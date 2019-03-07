@@ -19,15 +19,15 @@ import config
 import utils
 from optims import Optim
 import lr_scheduler as L
-from models import model,model_deepSpeaker
-from mod predata_fromnp import prepare_data
+from models import model_deepSpeaker as model
+from predata_fromnp import prepare_data
 
 #config
 parser = argparse.ArgumentParser(description='train.py')
 
 parser.add_argument('-config', default='config.py', type=str,
                     help="config file")
-parser.add_argument('-gpus', default=[0], nargs='+', type=int,
+parser.add_argument('-gpus', default=[3], nargs='+', type=int,
                     help="Use CUDA on the listed devices.")
 parser.add_argument('-restore', default=None, type=str,
                    help="restore checkpoint")
@@ -72,7 +72,7 @@ if use_cuda:
     torch.cuda.manual_seed(opt.seed)
 
 print('building model...\n')
-model = model.basic_audio_model(config, use_cuda, all_spk_num)
+model = model.basic_audio_model_deepSpeaker(config, use_cuda, all_spk_num)
 
 loss_func=nn.CrossEntropyLoss()
 if opt.restore:
@@ -130,7 +130,7 @@ total_loss_batch, start_time = 0, time.time()
 right_idx_everyXupdates = 0
 
 lera.log_hyperparams({
-    'title':'MSC v6 only Audio model',
+    'title':'MSC v6 only Audio DeepSpeaker model',
     'updates':updates,
     'log path': log_path,
     'mask_softmax:': config.mask_softmax,
@@ -185,28 +185,20 @@ def train(epoch,data):
             continue
         elif duration>config.Max_Len:
             speech_feats=np.load(config.aim_path+speech_path)
-            images_feats=np.load(config.aim_path+images_path)
-            assert images_feats.shape[0]*4==speech_feats.shape[0]
             shift_time=np.random.random()*(duration-config.Max_Len) #可供移动的时间长度
             shift_frames_image=int(shift_time*25)
             shift_frames_speech=4*shift_frames_image
-            images_feats=images_feats[shift_frames_image:int(shift_frames_image+config.Max_Len*25)]
             speech_feats=speech_feats[shift_frames_speech:int(shift_frames_speech+config.Max_Len*100)]
-            assert images_feats.shape[0]*4==speech_feats.shape[0]
         else:
             speech_feats = np.load(config.aim_path + speech_path)
-            images_feats = np.load(config.aim_path + images_path)
-            assert images_feats.shape[0] * 4 == speech_feats.shape[0]
-        print('Enter into the model:', images_feats.shape, speech_feats.shape)
-        images_feats = Variable(torch.tensor(images_feats))
+        print('Enter into the model:',  speech_feats.shape)
         speech_feats = Variable(torch.tensor(speech_feats))
 
         try:
             if use_cuda:
-                images_feats = images_feats.cuda()
                 speech_feats = speech_feats.cuda()
             model.zero_grad()
-            predict_score, mask = model(images_feats, speech_feats)
+            predict_score, mask = model(speech_feats)
             if not config.class_frame:
                 predict_label = torch.argmax(predict_score, 1).squeeze().item()
             else:
@@ -214,9 +206,7 @@ def train(epoch,data):
                 predict_idx = torch.argmax(predict_score).item()
                 predict_label = predict_idx % len(config.spks_list)
 
-            target_spk = torch.tensor(config.spks_list.index(spk_name))
-            if config.class_frame:
-                target_spk = target_spk.expand(images_feats.shape[0])
+            target_spk = torch.tensor(config.spks_list.index(spk_name)).unsqueeze(0)
 
             if predict_label == config.spks_list.index(spk_name):
                 right_idx_per_epoch += 1
@@ -281,14 +271,14 @@ def train(epoch,data):
             if updates%config.save_inter==0:
                 save_model(save_pat)
 
-        except  RuntimeError as RR:
+        except IndexError as RR:
             print('EEE errors here: ',RR)
             loss_grad_list=None # set to 0 every N samples.
             continue
-        except Exception as RR:
-            print(' errors here: ',RR)
-            loss_grad_list=None # set to 0 every N samples.
-            continue
+        # except Exception as RR:
+        #     print(' errors here: ',RR)
+        #     loss_grad_list=None # set to 0 every N samples.
+        #     continue
 
     print('Loss aver for this epoch:',loss_total/len(data))
     print('Acc aver for this epoch:',right_idx_per_epoch/float(len(data)))
@@ -320,28 +310,20 @@ def eval(epoch,data):
             continue
         elif duration>config.Max_Len:
             speech_feats=np.load(config.aim_path+speech_path)
-            images_feats=np.load(config.aim_path+images_path)
-            assert images_feats.shape[0]*4==speech_feats.shape[0]
             shift_time=np.random.random()*(duration-config.Max_Len) #可供移动的时间长度
             shift_frames_image=int(shift_time*25)
             shift_frames_speech=4*shift_frames_image
-            images_feats=images_feats[shift_frames_image:int(shift_frames_image+config.Max_Len*25)]
             speech_feats=speech_feats[shift_frames_speech:int(shift_frames_speech+config.Max_Len*100)]
-            assert images_feats.shape[0]*4==speech_feats.shape[0]
         else:
             speech_feats=np.load(config.aim_path+speech_path)
-            images_feats=np.load(config.aim_path+images_path)
-            assert images_feats.shape[0]*4==speech_feats.shape[0]
-        print('Enter into the model:',images_feats.shape,speech_feats.shape)
-        images_feats=Variable(torch.tensor(images_feats))
+        print('Enter into the model:',speech_feats.shape)
         speech_feats=Variable(torch.tensor(speech_feats))
 
         try:
             if use_cuda:
-                images_feats=images_feats.cuda()
                 speech_feats=speech_feats.cuda()
             model.zero_grad()
-            predict_score,mask=model(images_feats,speech_feats)
+            predict_score,mask=model(speech_feats)
             if not config.class_frame:
                 predict_label=torch.argmax(predict_score,1).squeeze().item()
             else:
@@ -350,8 +332,6 @@ def eval(epoch,data):
                 predict_label=predict_idx%len(config.spks_list)
 
             target_spk=torch.tensor(config.spks_list.index(spk_name))
-            if config.class_frame:
-                target_spk=target_spk.expand(images_feats.shape[0])
 
             if predict_label==config.spks_list.index(spk_name):
                 right_idx_per_epoch+=1
