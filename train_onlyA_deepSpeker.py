@@ -271,7 +271,7 @@ def train(epoch,data):
             if updates%config.save_inter==0:
                 save_model(save_pat)
 
-        except IndexError as RR:
+        except RuntimeError as RR:
             print('EEE errors here: ',RR)
             loss_grad_list=None # set to 0 every N samples.
             continue
@@ -331,7 +331,7 @@ def eval(epoch,data):
                 predict_idx=torch.argmax(predict_score).item()
                 predict_label=predict_idx%len(config.spks_list)
 
-            target_spk=torch.tensor(config.spks_list.index(spk_name))
+            target_spk=torch.tensor(config.spks_list.index(spk_name)).unsueeze(0)
 
             if predict_label==config.spks_list.index(spk_name):
                 right_idx_per_epoch+=1
